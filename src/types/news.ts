@@ -1,3 +1,4 @@
+// src/types/news.ts - Updated with content property
 export interface Article {
   id: number | string;
   title: string;
@@ -10,7 +11,7 @@ export interface Article {
   };
   category: 'flood-control' | 'dpwh' | 'corrupt-politicians' | 'nepo-babies';
   url?: string;
-  content?: string;
+  content?: string; // Added this property to support TLDR generation
 }
 
 export interface Category {

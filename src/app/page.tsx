@@ -20,6 +20,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  FileText,      // For TLDR button
+  Zap,          // For TLDR icon
+  ExternalLink,
+  Check,
+  Copy  // For read more button
 } from 'lucide-react';
 
 const FALLBACK_IMAGE =
@@ -34,6 +39,7 @@ type Article = {
   source: { name: string };
   category: 'flood-control' | 'dpwh' | 'corrupt-politicians' | 'nepo-babies';
   url?: string;
+  content?: string;
 };
 
 interface ApiResponse {
@@ -530,9 +536,65 @@ const CheeseMiss = () => {
   // Article card component
   const ArticleCard = ({ article, index }: { article: Article; index: number }) => {
     const isFav = favorites.includes(article.id);
+    const [showTldr, setShowTldr] = useState(false);
+    const [tldr, setTldr] = useState<string>('');
+    const [loadingTldr, setLoadingTldr] = useState(false);
+    const [tldrError, setTldrError] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+
+    const tldrId = `tldr-${article.id}-${index}`;
+
+    const generateTldr = async () => {
+      if (tldr || loadingTldr) return;
+      setLoadingTldr(true);
+      setTldrError(null);
+      try {
+        const response = await fetch('/api/tldr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: article.title,
+            description: article.description,
+            content: article.content || article.description,
+          }),
+        });
+        if (!response.ok) throw new Error(await response.text().catch(() => ''));
+        const data = await response.json();
+        setTldr((data?.tldr || '').trim());
+        if (!data?.tldr) setTldrError('No summary returned.');
+      } catch (error) {
+        setTldrError('Failed to generate summary.');
+        console.error('TLDR error:', error);
+      } finally {
+        setLoadingTldr(false);
+      }
+    };
+
+    const handleToggleTldr = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!showTldr && !tldr && !tldrError) generateTldr();
+      setShowTldr((s) => !s);
+    };
+
+    const handleCopy = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!tldr) return;
+      try {
+        await navigator.clipboard.writeText(tldr);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 900);
+      } catch {}
+    };
+
+    const tldrLines =
+      tldr
+        ?.split('\n')
+        .map((l: string) => l.trim())
+        .filter(Boolean) || [];
+
     return (
       <div
-        className="group border border-gray-200 bg-white rounded-xl overflow-hidden hover:border-gray-300 transition-colors cursor-pointer"
+        className="group border border-gray-200 bg-white rounded-xl overflow-hidden hover:border-gray-300 transition-all duration-200 cursor-pointer"
         onClick={() => setSelectedArticle(article)}
         role="button"
         tabIndex={0}
@@ -551,14 +613,18 @@ const CheeseMiss = () => {
               toggleFavorite(article.id);
             }}
             aria-label="Toggle favorite"
-            className={`absolute top-3 right-3 w-9 h-9 rounded-lg grid place-items-center transition-colors
-              ${isFav ? 'bg-red-500 text-white' : 'bg-white/90 text-gray-700 hover:bg-red-50 hover:text-red-600'}`}
+            className={`absolute top-3 right-3 w-9 h-9 rounded-lg grid place-items-center transition-colors ${
+              isFav
+                ? 'bg-red-500 text-white'
+                : 'bg-white/90 text-gray-700 hover:bg-red-50 hover:text-red-600'
+            }`}
           >
             <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
           </button>
         </div>
 
         <div className="p-4">
+          {/* Meta */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
@@ -575,8 +641,94 @@ const CheeseMiss = () => {
             <div className="text-xs text-gray-400">#{index + 1}</div>
           </div>
 
+          {/* TL;DR collapsible */}
+          <div
+            className={`transition-[max-height,opacity] duration-300 ease-out ${
+              showTldr ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'
+            } overflow-hidden`}
+            id={tldrId}
+            aria-hidden={!showTldr}
+          >
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-red-800">
+                  <Zap className="w-4 h-4" />
+                  <span className="text-[11px] font-semibold uppercase tracking-wide">
+                    TL;DR
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {loadingTldr ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-red-700">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Summarizing…
+                    </span>
+                  ) : tldr ? (
+                    <button
+                      onClick={handleCopy}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] border ${
+                        copied
+                          ? 'bg-red-600 text-white border-red-600'
+                          : 'bg-white text-red-700 border-red-200 hover:bg-red-100'
+                      }`}
+                      title="Copy summary"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  ) : tldrError ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        generateTldr();
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-white text-red-700 border border-red-200 hover:bg-red-100"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Retry
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {loadingTldr ? (
+                <div className="space-y-2" aria-live="polite">
+                  <div className="h-2.5 rounded bg-red-100 animate-pulse" />
+                  <div className="h-2.5 rounded bg-red-100 animate-pulse w-11/12" />
+                  <div className="h-2.5 rounded bg-red-100 animate-pulse w-9/12" />
+                </div>
+              ) : tldr ? (
+                tldrLines.length > 1 ? (
+                  <ul className="ml-5 list-disc text-[13px] text-red-900 leading-relaxed space-y-1">
+                    {tldrLines.map((line, idx) => (
+                      <li key={idx}>{line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p
+                    className="text-[13px] text-red-900 leading-relaxed"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 6,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {tldr}
+                  </p>
+                )
+              ) : tldrError ? (
+                <div className="flex items-center gap-2 text-red-700">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-sm">{tldrError}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Title */}
           <h3
-            className="text-gray-900 font-semibold mb-1 leading-snug"
+            className="text-gray-900 font-semibold mb-1 leading-snug hover:text-red-600 transition-colors"
             style={{
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -587,6 +739,7 @@ const CheeseMiss = () => {
             {article.title}
           </h3>
 
+          {/* Description */}
           <p
             className="text-gray-600 text-sm"
             style={{
@@ -599,23 +752,25 @@ const CheeseMiss = () => {
             {article.description}
           </p>
 
-          <div className="mt-3 flex items-center gap-2">
+          {/* Footer (TL;DR only) */}
+          <div className="mt-3 flex items-center justify-between">
             <span className="text-xs text-gray-500 px-2 py-1 rounded-lg bg-gray-50">
               {getReadTime(article.description)}
             </span>
+
             <button
-              onClick={(e) => e.stopPropagation()}
-              className="ml-auto w-9 h-8 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 grid place-items-center"
-              aria-label="Comments"
+              onClick={handleToggleTldr}
+              aria-controls={tldrId}
+              aria-expanded={showTldr}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                showTldr
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-700'
+              }`}
+              title="Toggle TL;DR"
             >
-              <MessageCircle className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => handleShare(e, article)}
-              className="w-9 h-8 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 grid place-items-center"
-              aria-label="Share"
-            >
-              <Share2 className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5" />
+              TL;DR
             </button>
           </div>
         </div>
