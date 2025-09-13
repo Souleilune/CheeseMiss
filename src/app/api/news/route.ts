@@ -34,75 +34,231 @@ export interface NewsResponse {
   providerTrace?: string[];
 }
 
-// Curated PH outlets/domains
-const PH_OUTLETS = [
-  'ABS-CBN News',
-  'GMA News',
-  'CNN Philippines',
-  'Philippine Daily Inquirer',
-  'Rappler',
-  'Manila Bulletin',
-  'Philippine Star',
-  'The Manila Times',
-  'BusinessWorld Philippines',
-  'SunStar',
-  'Daily Tribune',
-  'Manila Standard',
-  'One News PH',
-  'Philippine News Agency (PNA)',
-] as const;
+// Philippine RSS Feeds - All FREE!
+const PH_RSS_FEEDS = [
+  // Tier 1: High Priority Sources
+  {
+    url: 'https://www.rappler.com/rss/',
+    source: 'Rappler',
+    priority: 1,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control'] // All categories
+  },
+  {
+    url: 'https://newsinfo.inquirer.net/rss.xml',
+    source: 'Philippine Daily Inquirer',
+    priority: 1,
+    categories: ['dpwh', 'corrupt-politicians', 'nepo-babies', 'flood-control'] // All categories
+  },
+  {
+    url: 'https://www.gmanetwork.com/news/rss/',
+    source: 'GMA News',
+    priority: 1,
+    categories: ['nepo-babies', 'dpwh', 'corrupt-politicians', 'flood-control'] // All categories
+  },
 
-const PH_DOMAINS = [
-  'news.abs-cbn.com',
-  'gmanetwork.com',
-  'cnnphilippines.com',
-  'inquirer.net',
-  'rappler.com',
-  'mb.com.ph',
-  'philstar.com',
-  'manilatimes.net',
-  'businessworldonline.com',
-  'sunstar.com.ph',
-  'tribune.net.ph',
-  'manilastandard.net',
-  'onenews.ph',
-  'pna.gov.ph',
-] as const;
+  // Tier 2: Major Sources
+  {
+    url: 'https://www.philstar.com/rss/headlines',
+    source: 'Philippine Star',
+    priority: 2,
+    categories: ['flood-control', 'nepo-babies', 'dpwh', 'corrupt-politicians'] // All categories
+  },
+  {
+    url: 'https://mb.com.ph/feed/',
+    source: 'Manila Bulletin',
+    priority: 2,
+    categories: ['corrupt-politicians', 'flood-control', 'dpwh', 'nepo-babies'] // All categories
+  },
+  {
+    url: 'https://www.manilatimes.net/feed/',
+    source: 'The Manila Times',
+    priority: 2,
+    categories: ['corrupt-politicians', 'dpwh', 'nepo-babies', 'flood-control'] // All categories
+  },
+  
+  // Tier 3: Additional Sources
+  {
+    url: 'https://tribune.net.ph/feed/',
+    source: 'Daily Tribune',
+    priority: 3,
+    categories: ['dpwh', 'flood-control', 'corrupt-politicians', 'nepo-babies'] // All categories
+  },
+  {
+    url: 'https://manilastandard.net/rss.xml',
+    source: 'Manila Standard',
+    priority: 3,
+    categories: ['corrupt-politicians', 'dpwh', 'nepo-babies', 'flood-control'] // All categories
+  },
+  {
+    url: 'https://www.sunstar.com.ph/rss',
+    source: 'SunStar',
+    priority: 3,
+    categories: ['corrupt-politicians', 'flood-control', 'dpwh', 'nepo-babies'] // All categories
+  },
+  {
+    url: 'https://businessworldonline.com/feed/',
+    source: 'BusinessWorld Philippines',
+    priority: 3,
+    categories: ['corrupt-politicians', 'dpwh', 'nepo-babies', 'flood-control'] // All categories
+  },
 
-const DOMAIN_TO_OUTLET: Record<string, string> = {
-  'news.abs-cbn.com': 'ABS-CBN News',
-  'gmanetwork.com': 'GMA News',
-  'cnnphilippines.com': 'CNN Philippines',
-  'inquirer.net': 'Philippine Daily Inquirer',
-  'rappler.com': 'Rappler',
-  'mb.com.ph': 'Manila Bulletin',
-  'philstar.com': 'Philippine Star',
-  'manilatimes.net': 'The Manila Times',
-  'businessworldonline.com': 'BusinessWorld Philippines',
-  'sunstar.com.ph': 'SunStar',
-  'tribune.net.ph': 'Daily Tribune',
-  'manilastandard.net': 'Manila Standard',
-  'onenews.ph': 'One News PH',
-  'pna.gov.ph': 'Philippine News Agency (PNA)',
+  // Tier 4: Regional/Specialized Sources
+  {
+    url: 'https://www.pna.gov.ph/rss.xml',
+    source: 'Philippine News Agency (PNA)',
+    priority: 4,
+    categories: ['corrupt-politicians', 'dpwh', 'flood-control', 'nepo-babies'] // All categories
+  },
+  {
+    url: 'https://onenews.ph/feed',
+    source: 'One News PH',
+    priority: 4,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control'] // All categories
+  },
+  {
+    url: 'https://interaksyon.philstar.com/feed/',
+    source: 'Interaksyon',
+    priority: 4,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control'] // All categories
+  },
+  {
+    url: 'https://www.cnnphilippines.com/rss/news.xml',
+    source: 'CNN Philippines',
+    priority: 2,
+    categories: ['corrupt-politicians', 'dpwh', 'nepo-babies', 'flood-control'] // All categories
+  },
+  {
+    url: 'https://news.abs-cbn.com/rss',
+    source: 'ABS-CBN News',
+    priority: 2,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control'] // All categories
+  }
+];
+
+const ADDITIONAL_OPINION_FEEDS = [
+  // PhilStar Opinion/Editorial sections
+  {
+    url: 'https://www.philstar.com/rss/opinion',
+    source: 'Philippine Star Opinion',
+    priority: 2,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control']
+  },
+  {
+    url: 'https://www.philstar.com/rss/editorials',
+    source: 'Philippine Star Editorial',
+    priority: 2,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control']
+  },
+  
+  // Other Opinion sections
+  {
+    url: 'https://www.rappler.com/rss/thought-leaders/',
+    source: 'Rappler Thought Leaders',
+    priority: 2,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control']
+  },
+  {
+    url: 'https://newsinfo.inquirer.net/category/opinion/rss',
+    source: 'Inquirer Opinion',
+    priority: 2,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control']
+  },
+  {
+    url: 'https://mb.com.ph/category/opinion/feed/',
+    source: 'Manila Bulletin Opinion',
+    priority: 2,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control']
+  },
+  
+  // Alternative PhilStar feeds
+  {
+    url: 'https://www.philstar.com/feed/',
+    source: 'Philippine Star All',
+    priority: 3,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control']
+  },
+  {
+    url: 'https://www.philstar.com/rss/news',
+    source: 'Philippine Star News',
+    priority: 2,
+    categories: ['corrupt-politicians', 'nepo-babies', 'dpwh', 'flood-control']
+  }
+];
+
+// Corruption detection keywords by category
+const UPDATED_CORRUPTION_KEYWORDS = {
+  'corrupt-politicians': [
+    'corrupt', 'corruption', 'plunder', 'malversation', 'kickback', 'bribery',
+    'ghost employee', 'anomalous', 'ombudsman', 'sandiganbayan', 'swiss bank',
+    'unexplained wealth', 'lifestyle check', 'saln', 'pork barrel', 'pdaf',
+    'graft', 'impeachment', 'plunder case', 'arrested mayor', 'arrested governor',
+    'anti-graft', 'comelec', 'pcgg', 'marcos wealth', 'hidden assets'
+  ],
+  'dpwh': [
+    'dpwh', 'ghost project', 'overpriced', 'infrastructure scam', 'road project',
+    'bridge anomaly', 'kickback', 'contractor', 'bid rigging', 'coa audit',
+    'public works', 'highway corruption', 'construction fraud', 'fake invoice',
+    'substandard materials', 'build build build', 'infrastructure corruption',
+    'procurement anomaly', 'contract irregularity', 'project overrun'
+  ],
+  'flood-control': [
+    'flood control', 'dike', 'embankment', 'drainage', 'ghost project',
+    'substandard', 'flood mitigation', 'pumping station', 'river dredging',
+    'flood management', 'waterway', 'flood infrastructure', 'dam project',
+    'retaining wall', 'spillway', 'watershed', 'flood prone', 'sea wall',
+    'storm surge', 'flood prevention'
+  ],
+  'nepo-babies': [
+    // ENHANCED: Use the expanded keywords list
+    'political dynasty', 'nepo baby', 'nepo babies', 'politician son', 'politician daughter',
+    'luxury car', 'expensive', 'lamborghini', 'ferrari', 'penthouse',
+    'shopping spree', 'instagram', 'tiktok', 'lavish lifestyle', 'family wealth',
+    
+    // Specific names
+    'claudine co', 'gela marasigan', 'gela alonte', 'vern enciso', 'verniece enciso',
+    'jammy cruz', 'jasmine chan', 'christine lim',
+    
+    // CRITICAL: Opinion/Editorial specific terms for the missing article
+    'canceled nepo babies', 'cancel nepo babies', 'nepo baby culture',
+    'political family', 'dynasty politics', 'inherited power', 'family politics',
+    'privileged youth', 'political heir', 'born into politics', 'political bloodline',
+    
+    // Social media luxury indicators
+    'designer', 'brand new', 'luxury lifestyle', 'expensive taste', 'wealthy family',
+    'private school', 'exclusive', 'high-end', 'premium', 'lavish', 'extravagant',
+    
+    // Additional terms that might appear in opinion pieces
+    'politician family', 'mayor son', 'governor daughter', 'congressman son', 'senator daughter',
+    'luxury watch', 'designer bag', 'private jet', 'yacht', 'mansion',
+    'exclusive school', 'abroad vacation', 'expensive jewelry', 'brand new car',
+    'lavish wedding', 'luxury hotel', 'five star', 'first class flight'
+  ]
 };
 
-const EXCLUDE_DOMAINS = [
-  'news.google.com',
-  'news.yahoo.com',
-  'yahoo.com',
-  'msn.com',
-  'pressreader.com',
-  'facebook.com',
-  'twitter.com',
-  'x.com',
-  'reddit.com',
-  'youtube.com',
-] as const;
+const ENHANCED_NEPO_KEYWORDS = [
+  // Original keywords
+  'political dynasty', 'nepo baby', 'nepo babies', 'politician son', 'politician daughter',
+  'luxury car', 'expensive', 'lamborghini', 'ferrari', 'penthouse',
+  'shopping spree', 'instagram', 'tiktok', 'lavish lifestyle', 'family wealth',
+  
+  // Specific names
+  'claudine co', 'gela marasigan', 'gela alonte', 'vern enciso', 'verniece enciso',
+  'jammy cruz', 'jasmine chan', 'christine lim',
+  
+  // Opinion/Editorial specific terms
+  'canceled nepo babies', 'cancel nepo babies', 'nepo baby culture',
+  'political family', 'dynasty politics', 'inherited power', 'family politics',
+  'privileged youth', 'political heir', 'born into politics', 'political bloodline',
+  
+  // Social media luxury indicators
+  'designer', 'brand new', 'luxury lifestyle', 'expensive taste', 'wealthy family',
+  'private school', 'exclusive', 'high-end', 'premium', 'lavish', 'extravagant'
+];
 
-// Small in-memory sticky cache (60s) to avoid blanking UI on transient 0 results
+// Cache configuration
 type CacheKey = string;
-const CACHE_TTL_MS = 60_000;
-const MAX_CACHE_ENTRIES = 100;
+const CACHE_TTL_MS = 300_000; // 5 minutes for RSS feeds
+const MAX_CACHE_ENTRIES = 200;
 const memoryCache = new Map<
   CacheKey,
   { ts: number; articles: NewsArticle[]; providerTrace: string[] }
@@ -128,835 +284,451 @@ function getCached(key: CacheKey) {
 function setCached(key: CacheKey, articles: NewsArticle[], providerTrace: string[]) {
   memoryCache.set(key, { ts: Date.now(), articles, providerTrace });
   if (memoryCache.size > MAX_CACHE_ENTRIES) {
-    let oldestKey: string | null = null;
-    let oldestTs = Infinity;
-    for (const [k, v] of memoryCache) {
-      if (v.ts < oldestTs) {
-        oldestTs = v.ts;
-        oldestKey = k;
-      }
-    }
-    if (oldestKey) memoryCache.delete(oldestKey);
+    const oldestKey = Array.from(memoryCache.entries())
+      .sort(([,a], [,b]) => a.ts - b.ts)[0][0];
+    memoryCache.delete(oldestKey);
   }
 }
 
-// Utilities
+// Utility functions
 const withinWindow = (iso: string, from?: string | null, to?: string | null) => {
   if (!from && !to) return true;
   
   const articleTime = new Date(iso).getTime();
-  
-  // Handle invalid dates
-  if (isNaN(articleTime)) {
-    console.warn('Invalid date in article:', iso);
-    return true; // Include articles with invalid dates rather than exclude them
-  }
+  if (isNaN(articleTime)) return true;
   
   if (from) {
     const fromTime = new Date(from).getTime();
-    if (isNaN(fromTime)) {
-      console.warn('Invalid from date:', from);
-    } else if (articleTime < fromTime) {
-      return false;
-    }
+    if (!isNaN(fromTime) && articleTime < fromTime) return false;
   }
   
   if (to) {
     const toTime = new Date(to).getTime();
-    if (isNaN(toTime)) {
-      console.warn('Invalid to date:', to);
-    } else if (articleTime > toTime) {
-      return false;
-    }
+    if (!isNaN(toTime) && articleTime > toTime) return false;
   }
   
   return true;
 };
 
-const getHostname = (u?: string) => {
-  if (!u) return '';
-  try {
-    return new URL(u).hostname.replace(/^www\./, '');
-  } catch {
-    return '';
-  }
-};
-
-const guessSourceName = (url?: string, fallback?: string) => {
-  const host = getHostname(url);
-  return DOMAIN_TO_OUTLET[host] || fallback || host || 'Unknown';
-};
-
-const normalizeTitle = (t?: string) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
-
-const isLocalOutlet = (sourceName?: string, url?: string) => {
-  const host = getHostname(url);
-  if (PH_DOMAINS.includes(host as (typeof PH_DOMAINS)[number])) return true;
-  const src = (sourceName || '').toLowerCase();
-  return (
-    PH_OUTLETS.some((o) => o.toLowerCase() === src) ||
-    src.includes('philippine') ||
-    src.includes('philippines') ||
-    src.includes('abs-cbn') ||
-    src.includes('gma') ||
-    src.includes('rappler') ||
-    src.includes('inquirer') ||
-    src.includes('philstar') ||
-    src.includes('manila') ||
-    src.includes('cnn philippines') ||
-    src.includes('sunstar') ||
-    src.includes('businessworld')
-  );
-};
-
-const dedupeArticles = (items: NewsArticle[]) => {
-  const byUrl = new Map<string, NewsArticle>();
-  const byTitle = new Map<string, NewsArticle>();
-  for (const a of items) {
-    const keyUrl = (a.url || '').split('?')[0];
-    const keyTitle = normalizeTitle(a.title);
-    const host = getHostname(a.url);
-    if (EXCLUDE_DOMAINS.includes(host as (typeof EXCLUDE_DOMAINS)[number])) continue;
-    if (keyUrl && !byUrl.has(keyUrl)) {
-      byUrl.set(keyUrl, a);
-    } else if (keyTitle && !byTitle.has(keyTitle)) {
-      byTitle.set(keyTitle, a);
-    }
-  }
-  const merged = Array.from(byUrl.values());
-  for (const [t, art] of byTitle) {
-    if (!merged.find((m) => normalizeTitle(m.title) === t)) {
-      merged.push(art);
-    }
-  }
-  return merged;
-};
-
-// Category typing/guard
-const CATEGORY_VALUES = [
-  'flood-control',
-  'dpwh',
-  'corrupt-politicians',
-  'nepo-babies',
-] as const;
-type CategoryKey = typeof CATEGORY_VALUES[number];
-function isCategory(val: string): val is CategoryKey {
-  return (CATEGORY_VALUES as readonly string[]).includes(val);
-}
-function normalizeCategoryKey(cat: string): NewsArticle['category'] {
-  return isCategory(cat) ? cat : 'corrupt-politicians';
-}
-
-// Stable IDs from URL/title
 function stableId(prefix: string, url?: string, fallbackKey?: string) {
   const key = url || fallbackKey || Math.random().toString(36);
   const hash = createHash('sha1').update(key).digest('hex').slice(0, 16);
   return `${prefix}_${hash}`;
 }
 
-// Param parsing/validation
-function parseParams(req: NextRequest) {
-  const sp = new URL(req.url).searchParams;
-  const rawCategory = sp.get('category') || 'all';
-  const category = (['all', ...CATEGORY_VALUES] as readonly string[]).includes(rawCategory)
-    ? (rawCategory as 'all' | NewsArticle['category'])
-    : 'all';
-
-  const q = sp.get('q');
-
-  const from = sp.get('from');
-  const to = sp.get('to');
-  const isIso = (v: string | null) => !v || !Number.isNaN(new Date(v).getTime());
-  const fromIso = isIso(from) ? from : null;
-  const toIso = isIso(to) ? to : null;
-
-  let page = Number(sp.get('page') || '1');
-  if (!Number.isFinite(page) || page < 1) page = 1;
-
-  let pageSize = Number(sp.get('pageSize') || '20');
-  if (!Number.isFinite(pageSize)) pageSize = 20;
-  pageSize = Math.min(50, Math.max(1, pageSize)); // clamp 1–50
-
-  return { category, query: q, from: fromIso, to: toIso, page, pageSize };
-}
-
-// Helper: timed JSON fetch
-async function fetchJsonWithTimeout<T>(url: string, init: RequestInit, timeoutMs: number): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      ...init,
-      signal: controller.signal,
-      cache: 'no-store',
-      next: { revalidate: 0 },
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`${res.status} ${res.statusText}${errText ? `: ${errText}` : ''}`);
-    }
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// Build query by category
-function buildCategoryQuery(category: string, userQuery?: string | null) {
-  const base: Record<CategoryKey, string> = {
-    'flood-control':
-      'Philippines ("flood control" OR dike OR embankment) (ghost project OR corruption OR scam OR kickback OR overprice OR audit) DPWH',
-    dpwh:
-      'Philippines DPWH (corruption OR arrested OR investigation OR "unexplained wealth" OR "ghost project" OR kickback OR overprice OR audit)',
-    'corrupt-politicians':
-      'Philippines (politician OR senator OR congressman OR governor OR mayor) (corruption OR plunder OR malversation OR "Swiss bank" OR "hidden assets" OR kickback OR audit OR Ombudsman OR Sandiganbayan)',
-    'nepo-babies':
-      'Philippines (political dynasty OR "nepo baby" OR "politician son" OR "politician daughter") (Instagram OR TikTok OR luxury OR Lamborghini OR penthouse OR "shopping spree")',
-  };
-  const q =
-    category === 'all'
-      ? 'Philippines corruption DPWH flood control politician "ghost project"'
-      : base[(category as CategoryKey) in base ? (category as CategoryKey) : 'corrupt-politicians'];
-  return userQuery ? `${q} ${userQuery}` : q;
-}
-
-// Gemini prompt (includes the names in nepo-babies block)
-function getGeminiSearchPrompt(
-  category: string,
-  query?: string,
-  from?: string | null,
-  to?: string | null
-): string {
-  const outlets = PH_OUTLETS.join(', ');
-  const domains = PH_DOMAINS.join(', ');
-  const exclude = EXCLUDE_DOMAINS.join(', ');
-  const timeScope =
-    from && to
-      ? `Time window: between ${from} and ${to}.`
-      : `Time window: prioritize the last 6–12 months, and ALSO include older, relevant Philippine articles (up to ~10 years). Include the year for older items.`;
-
-  const commonRules = `
-Strict locality:
-- Only Philippine local outlets (NO foreign wires/aggregators).
-- Prefer outlets: ${outlets}.
-- Prefer domains: ${domains}.
-- Exclude aggregators (e.g., ${exclude}). Use the canonical local outlet URL.
-
-${timeScope}
-
-Required per item:
-- Headline, source outlet, canonical URL, date (yyyy-mm-dd),
-- 2–3 sentence description with names and ₱ amounts,
-- Bullet key details, and OLDER_REFERENCE: yes/no.`;
-
-  const map: Record<string, string> = {
-    'flood-control': `Task: Flood control corruption in the Philippines.
-Focus:
-- Ghost flood-control projects (> ₱1B), unbuilt/substandard dikes/embankments.
-- DPWH flood-control officials and contractors named.
-- Hotspots: Metro Manila, Pampanga, Cagayan, Bicol, Mindanao.
-- COA audits; Ombudsman/Sandiganbayan cases.
-${commonRules}`,
-
-    dpwh: `Task: DPWH corruption in the Philippines.
-Focus:
-- Unexplained wealth, ghost roads/bridges/buildings, contractor kickbacks.
-- COA findings; Ombudsman cases; court proceedings.
-${commonRules}`,
-
-    'corrupt-politicians': `Task: Corrupt Filipino politicians.
-Focus:
-- Wealth beyond salaries, Swiss/offshore accounts, ghost employees/projects.
-- Ombudsman/COA/Sandiganbayan cases; lifestyle checks; SALN gaps.
-${commonRules}`,
-
-    'nepo-babies': `Task: Political dynasties & nepotism in the Philippines.
-Focus:
-- Children/relatives flaunting wealth; luxury cars/shopping/vacations vs parent’s salary.
-- Dynasties with multiple offices.
-- Include the following public figures as search hints ONLY IF there is coverage by reputable Filipino outlets (skip if no credible reporting; avoid gossip/defamation):
-  - Claudine Co
-  - Gela Marasigan
-  - Gela Alonte
-  - Vern Enciso
-  - Verniece Enciso
-  - Jammy Cruz
-  - Jasmine Chan
-  - Christine Lim
-${commonRules}`,
-  };
-
-  let prompt = map[category as keyof typeof map] || map['corrupt-politicians'];
-  if (query) {
-    prompt += `
-
-Additional Filipino keywords to include: ${query}`;
-  }
-
-  prompt += `
-
-Output:
-Provide 8–15 items (mix recent + at least 3 older references if available).
-Use EXACTLY this format per item:
-
-TITLE: ...
-SOURCE: ...
-URL: ...
-DATE: yyyy-mm-dd
-DESCRIPTION: ...
-CATEGORY: ${category}
-KEY_DETAILS:
-- ...
-- ...
-- ...
-OLDER_REFERENCE: yes/no`;
-
-  return prompt;
-}
-
-// Parse Gemini text to articles
-function parseGeminiResponse(text: string, category: string): NewsArticle[] {
-  if (!text) return [];
-  const blocks = text
-    .split(/\n{2,}(?=TITLE\s*:)/i)
-    .map((b) => b.trim())
-    .filter(Boolean);
-
-  const items: NewsArticle[] = [];
-  for (const block of blocks) {
-    const get = (label: string) =>
-      (block.match(new RegExp(`${label}\\s*:\\s*(.+)`, 'i')) || [])[1]?.trim();
-
-    const title = get('TITLE');
-    const sourceName = get('SOURCE');
-    let url = get('URL');
-    const date = get('DATE') || '';
-
-    if (!title) continue;
-    if (!url) {
-      const urlMatch = block.match(/https?:\/\/[^\s)]+/);
-      if (urlMatch) url = urlMatch[0];
-    }
-
-    let publishedAt: string;
-    try {
-      const dateObj = new Date(date);
-      if (Number.isNaN(dateObj.getTime())) throw new Error('Invalid date');
-      publishedAt = dateObj.toISOString();
-    } catch {
-      const dMatch = block.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
-      if (dMatch) {
-        const y = Number(dMatch[1]);
-        const m = Number(dMatch[2]);
-        const d = Number(dMatch[3]);
-        try {
-          publishedAt = new Date(Date.UTC(y, m - 1, d)).toISOString();
-        } catch {
-          publishedAt = new Date().toISOString();
-        }
-      } else {
-        publishedAt = new Date().toISOString();
-      }
-    }
-
-    const description = get('DESCRIPTION') || 'No description provided.';
-
-    const item: NewsArticle = {
-      id: stableId('gemini', url, title),
-      title,
-      description,
-      url,
-      urlToImage: undefined,
-      publishedAt,
-      source: { name: sourceName || guessSourceName(url) },
-      category: normalizeCategoryKey(category),
-    };
-
-    if (!isLocalOutlet(item.source.name, item.url)) continue;
-    items.push(item);
-  }
-
-  return dedupeArticles(items);
-}
-
-// Gemini types
-type GeminiPart = { text?: string };
-type GeminiContent = { parts?: GeminiPart[] };
-type GeminiCandidate = { content?: GeminiContent };
-type GeminiResponse = { candidates?: GeminiCandidate[] };
-
-// Fetch Gemini
-async function searchWithGemini(
-  category: string,
-  query?: string | null,
-  from?: string | null,
-  to?: string | null
-): Promise<NewsArticle[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  const configuredUrl = process.env.GEMINI_API_URL; // optional full path to :generateContent
-  if (!apiKey) throw new Error('Gemini API key missing');
-
-  const url = `${configuredUrl || getGeminiEndpoint()}?key=${apiKey}`;
-  const prompt = getGeminiSearchPrompt(category, query || undefined, from || undefined, to || undefined);
-  const data = await fetchJsonWithTimeout<GeminiResponse>(
-    url,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    },
-    8000
-  );
-
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  let items = parseGeminiResponse(text, category);
-  items = items.filter((a) => withinWindow(a.publishedAt, from, to));
-  return items.slice(0, 15);
-}
-
-// Tavily types/payload
-type TavilyResult = {
-  title?: string;
-  url?: string;
-  source?: string;
-  content?: string;
-  snippet?: string;
-  published_date?: string;
-};
-type TavilyResponse = { results?: TavilyResult[] };
-type TavilyPayload = {
-  api_key: string;
-  query: string;
-  search_depth: 'basic' | 'advanced';
-  include_domains?: readonly string[];
-  exclude_domains?: readonly string[];
-  max_results: number;
-  include_answer: boolean;
-  include_raw_content: boolean;
-  include_images: boolean;
-  language?: string;
-  time_range?: 'day' | 'week' | 'month' | 'year';
-};
-
-// Tavily (with widen retry)
-async function webSearchTavily(
-  category: string,
-  userQuery?: string | null,
-  from?: string | null,
-  to?: string | null,
-  pageSize: number = 20
-): Promise<NewsArticle[]> {
-  const key = process.env.TAVILY_API_KEY;
-  if (!key) throw new Error('Tavily API not configured');
-
-  let time_range: TavilyPayload['time_range'] | undefined = undefined;
-  let daysFromToday = 0; // Moved outside if block to fix scope issue
+function dedupeArticles(items: NewsArticle[]) {
+  const seen = new Set<string>();
+  const unique: NewsArticle[] = [];
   
-  if (from || to) {
-    const start = from ? new Date(from).getTime() : Date.now() - 365 * 24 * 60 * 60 * 1000;
-    const end = to ? new Date(to).getTime() : Date.now();
-    const spanDays = Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)));
-    
-    // Calculate how far back the start date is from today
-    daysFromToday = Math.floor((Date.now() - start) / (24 * 60 * 60 * 1000));
-    
-    // For very old dates (more than 365 days), don't use time_range restriction
-    if (daysFromToday > 365) {
-      time_range = undefined; // Remove time restriction for old dates
-    } else if (spanDays <= 7) {
-      time_range = 'week';
-    } else if (spanDays <= 31) {
-      time_range = 'month';
-    } else {
-      time_range = 'year';
+  for (const item of items) {
+    const key = `${item.title.toLowerCase().trim()}_${item.source.name}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(item);
     }
   }
+  
+  return unique;
+}
 
-  const query = buildCategoryQuery(category, userQuery);
-  const basePayload: TavilyPayload = {
-    api_key: key,
-    query,
-    search_depth: 'advanced',
-    include_domains: PH_DOMAINS,
-    exclude_domains: EXCLUDE_DOMAINS,
-    max_results: Math.min(10, Math.max(3, pageSize)),
-    include_answer: false,
-    include_raw_content: false,
-    include_images: false,
-    language: 'en',
-    time_range, // Will be undefined for very old dates
-  };
-
-  const run = async (payload: TavilyPayload) =>
-    fetchJsonWithTimeout<TavilyResponse>('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }, 8000);
-
-  // Pass 1: with include_domains
-  let data = await run(basePayload);
-
-  let mapped: NewsArticle[] = (data.results || []).map((r, i): NewsArticle => {
-    const publishedAt = r.published_date ? new Date(r.published_date).toISOString() : new Date().toISOString();
-    const sourceName = guessSourceName(r.url, r.source);
-    return {
-      id: stableId('tavily', r.url, r.title),
-      title: r.title || '',
-      description: r.content || r.snippet || 'No description.',
-      url: r.url,
-      urlToImage: undefined,
-      publishedAt,
-      source: { name: sourceName },
-      category: normalizeCategoryKey(category),
-      content: r.snippet || r.content || '',
-    };
-  });
-
-  let items = mapped
-    .filter((a) => isLocalOutlet(a.source.name, a.url))
-    .filter((a) => withinWindow(a.publishedAt, from, to));
-
-  // Pass 2: widen if empty - enhanced for old dates
-  if (!items.length) {
-    const widened: TavilyPayload = { ...basePayload };
-    delete widened.include_domains;
-    // For old dates, also remove time_range completely to maximize results
-    if (daysFromToday > 365) {
-      delete widened.time_range;
-    }
+// FIXED: RSS Parser Function (ES2017 compatible regex)
+async function parseRSSFeed(
+  feedUrl: string, 
+  sourceName: string, 
+  targetCategory?: string
+): Promise<NewsArticle[]> {
+  try {
+    console.log(`[RSS] Fetching ${sourceName}...`);
     
-    data = await run(widened);
-    mapped = (data.results || []).map((r, i): NewsArticle => {
-      const publishedAt = r.published_date ? new Date(r.published_date).toISOString() : new Date().toISOString();
-      const sourceName = guessSourceName(r.url, r.source);
-      return {
-        id: stableId('tavily', r.url, r.title),
-        title: r.title || '',
-        description: r.content || r.snippet || 'No description.',
-        url: r.url,
-        urlToImage: undefined,
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // Increased timeout
+    
+    const response = await fetch(feedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; NewsAggregator/1.0)',
+        'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml'
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const xmlText = await response.text();
+    const itemRegex = /<(?:item|entry)[^>]*>([\s\S]*?)<\/(?:item|entry)>/gi;
+    const itemMatches = Array.from(xmlText.matchAll(itemRegex));
+    
+    const articles: NewsArticle[] = [];
+    
+    // Process more articles to get better coverage
+    for (const match of itemMatches.slice(0, 100)) { // Increased from 50 to 100
+      const itemContent = match[1];
+      
+      // Extract title (handle CDATA)
+      const titleMatch = itemContent.match(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
+      const title = titleMatch?.[1]?.trim().replace(/<[^>]+>/g, '') || '';
+      
+      // Extract description/summary
+      const descMatch = itemContent.match(/<(?:description|summary|content)[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/(?:description|summary|content)>/i);
+      let description = descMatch?.[1]?.trim().replace(/<[^>]+>/g, '') || '';
+      
+      // Clean and expand description
+      description = description.substring(0, 800).trim(); // Increased from 500
+      if (description.length === 800) description += '...';
+      
+      // Extract link
+      const linkMatch = itemContent.match(/<link[^>]*>([^<]*)<\/link>|<link[^>]*href=["']([^"']*)/i);
+      const link = (linkMatch?.[1] || linkMatch?.[2] || '').trim();
+      
+      // Extract date
+      const dateMatch = itemContent.match(/<(?:pubDate|published|updated)[^>]*>(.*?)<\/(?:pubDate|published|updated)>/i);
+      const dateText = dateMatch?.[1]?.trim() || '';
+      
+      if (!title || !link) continue;
+      
+      // Parse publication date
+      let publishedAt = new Date().toISOString();
+      if (dateText) {
+        try {
+          const parsedDate = new Date(dateText);
+          if (!isNaN(parsedDate.getTime())) {
+            publishedAt = parsedDate.toISOString();
+          }
+        } catch {
+          // Use current date if parsing fails
+        }
+      }
+      
+      // Enhanced corruption detection
+      const contentToCheck = `${title} ${description}`;
+      const detection = isCorruptionRelated(contentToCheck, targetCategory);
+      
+      if (!detection.isRelevant) continue;
+      
+      // Skip if looking for specific category and this doesn't match
+      if (targetCategory && targetCategory !== 'all' && 
+          detection.detectedCategory !== targetCategory && detection.score < 2) {
+        continue;
+      }
+      
+      articles.push({
+        id: stableId('rss', link, title),
+        title,
+        description: description || 'No description available.',
+        url: link,
         publishedAt,
         source: { name: sourceName },
-        category: normalizeCategoryKey(category),
-        content: r.snippet || r.content || '',
-      };
-    });
-
-    items = mapped
-      .filter((a) => isLocalOutlet(a.source.name, a.url))
-      .filter((a) => withinWindow(a.publishedAt, from, to));
+        category: detection.detectedCategory,
+        content: description
+      });
+    }
+    
+    console.log(`[RSS] ${sourceName}: Found ${articles.length} relevant articles`);
+    return articles;
+    
+  } catch (error) {
+    console.warn(`[RSS] Failed to parse ${sourceName}:`, error);
+    return [];
   }
-
-  return dedupeArticles(items).slice(0, pageSize);
 }
 
-
-// Serper types
-type SerperNewsItem = {
-  title?: string;
-  snippet?: string;
-  link?: string;
-  source?: string;
-  date?: string;
-  imageUrl?: string;
-};
-type SerperNewsResponse = { news?: SerperNewsItem[] };
-
-// Serper (Google News)
-async function webSearchSerper(
-  category: string,
-  userQuery?: string | null,
-  from?: string | null,
-  to?: string | null,
-  pageSize: number = 20
-): Promise<NewsArticle[]> {
-  const key = process.env.SERPER_API_KEY;
-  if (!key) throw new Error('Serper API not configured');
-
-  const endpoint = 'https://google.serper.dev/news';
-  const siteFilter = PH_DOMAINS.map((d) => `site:${d}`).join(' OR ');
-  const q = `${buildCategoryQuery(category, userQuery)} ${siteFilter}`;
-
-  const data = await fetchJsonWithTimeout<SerperNewsResponse>(
-    endpoint,
-    {
-      method: 'POST',
-      headers: {
-        'X-API-KEY': key,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        q,
-        gl: 'ph',
-        hl: 'en',
-        num: Math.min(20, Math.max(10, pageSize)),
-        autocorrect: true,
-      }),
-    },
-    8000
-  );
-
-  const mapped: NewsArticle[] = (data.news || []).map((r, i): NewsArticle => {
-    const publishedAt = r.date ? new Date(r.date).toISOString() : new Date().toISOString();
-    const sourceName = guessSourceName(r.link, r.source);
-    return {
-      id: stableId('serper', r.link, r.title),
-      title: r.title || '',
-      description: r.snippet || 'No description.',
-      url: r.link,
-      urlToImage: r.imageUrl,
-      publishedAt,
-      source: { name: sourceName },
-      category: normalizeCategoryKey(category),
-      content: r.snippet || '',
-    };
-  });
-
-  const items = mapped
-    .filter((a) => isLocalOutlet(a.source.name, a.url))
-    .filter((a) => withinWindow(a.publishedAt, from, to));
-
-  return dedupeArticles(items).slice(0, pageSize);
-}
-
-// Orchestrator: try web providers in order
-async function searchWithWeb(
+// Main RSS Search Function
+async function searchWithRSS(
   category: string,
   query?: string | null,
   from?: string | null,
   to?: string | null,
   pageSize: number = 20
 ): Promise<NewsArticle[]> {
-  const preferred = (process.env.WEB_SEARCH_PROVIDER || '').toLowerCase();
-
-  const tryOrder: Array<() => Promise<NewsArticle[]>> = [];
-  const hasTavily = !!process.env.TAVILY_API_KEY;
-  const hasSerper = !!process.env.SERPER_API_KEY;
-
-  const pushByName = (name: string) => {
-    if (name === 'tavily' && hasTavily) tryOrder.push(() => webSearchTavily(category, query, from, to, pageSize));
-    if (name === 'serper' && hasSerper) tryOrder.push(() => webSearchSerper(category, query, from, to, pageSize));
-  };
-
-  if (preferred) pushByName(preferred);
-  if (tryOrder.length === 0) {
-    if (hasTavily) tryOrder.push(() => webSearchTavily(category, query, from, to, pageSize));
-    if (hasSerper) tryOrder.push(() => webSearchSerper(category, query, from, to, pageSize));
+  console.log(`[RSS] Starting search for category: ${category}`);
+  
+  // FIXED: Merge main feeds with additional opinion feeds
+  const allFeeds = [...PH_RSS_FEEDS, ...ADDITIONAL_OPINION_FEEDS];
+  const feedsToUse = allFeeds.sort((a, b) => a.priority - b.priority);
+  
+  console.log(`[RSS] Using ${feedsToUse.length} total feeds (including opinion sections)`);
+  
+  // Limit concurrent requests to avoid overwhelming servers
+  const maxConcurrent = 5;
+  const feedBatches: typeof feedsToUse[] = [];
+  
+  for (let i = 0; i < feedsToUse.length; i += maxConcurrent) {
+    feedBatches.push(feedsToUse.slice(i, i + maxConcurrent));
   }
-
-  let collected: NewsArticle[] = [];
-  let firstError: unknown = null;
-
-  for (const fn of tryOrder) {
-    try {
-      const res = await fn();
-      collected = dedupeArticles([...collected, ...res]);
-      if (collected.length) break;
-    } catch (e) {
-      if (!firstError) firstError = e;
+  
+  let allArticles: NewsArticle[] = [];
+  
+  // Process feeds in batches
+  for (const batch of feedBatches) {
+    const batchPromises = batch.map(feed => 
+      parseRSSFeed(feed.url, feed.source, category !== 'all' ? category : undefined)
+    );
+    
+    const batchResults = await Promise.allSettled(batchPromises);
+    
+    batchResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        allArticles.push(...result.value);
+        console.log(`[RSS] ${batch[index].source}: ${result.value.length} articles`);
+      } else {
+        console.warn(`[RSS] ${batch[index].source}: ${result.reason}`);
+      }
+    });
+    
+    // Small delay between batches to be respectful to servers
+    if (feedBatches.indexOf(batch) < feedBatches.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
-
-  if (!collected.length) {
-    if (firstError) throw firstError;
-    throw new Error('No web search provider available or returned results.');
+  
+  console.log(`[RSS] Total articles before filtering: ${allArticles.length}`);
+  
+  // Filter by category if specified
+  if (category && category !== 'all') {
+    allArticles = allArticles.filter(article => article.category === category);
+    console.log(`[RSS] After category filter (${category}): ${allArticles.length}`);
   }
-  return collected;
-}
-
-// NewsAPI fallback
-async function fetchNewsApiBatch(params: URLSearchParams) {
-  return fetchJsonWithTimeout<{ articles?: Array<Record<string, unknown>> }>(
-    `https://newsapi.org/v2/everything?${params.toString()}`,
-    { method: 'GET' },
-    8000
-  );
-}
-
-async function fallbackNewsAPISearch(
-  category: string,
-  query?: string | null,
-  from?: string | null,
-  to?: string | null,
-  page: number = 1,
-  pageSize: number = 20
-): Promise<NewsArticle[]> {
-  const apiKey = process.env.NEWS_API_KEY;
-  if (!apiKey) throw new Error('NewsAPI not configured');
-
-  const searchQuery = buildCategoryQuery(category, query);
-  const commonParams: Record<string, string> = {
-    apiKey,
-    q: searchQuery,
-    sortBy: from || to ? 'relevancy' : 'publishedAt',
-    page: String(page),
-    pageSize: String(pageSize),
-    searchIn: 'title,description,content',
-  };
-  if (from) commonParams.from = from;
-  if (to) commonParams.to = to;
-
-  const withDomains = new URLSearchParams({
-    ...commonParams,
-    language: 'en',
-    domains: PH_DOMAINS.join(','),
-    excludeDomains: EXCLUDE_DOMAINS.join(','),
+  
+  // Filter by query
+  if (query) {
+    const queryLower = query.toLowerCase();
+    allArticles = allArticles.filter(article => 
+      article.title.toLowerCase().includes(queryLower) ||
+      article.description.toLowerCase().includes(queryLower)
+    );
+    console.log(`[RSS] After query filter (${query}): ${allArticles.length}`);
+  }
+  
+  // Filter by date range
+  if (from || to) {
+    allArticles = allArticles.filter(article => 
+      withinWindow(article.publishedAt, from, to)
+    );
+    console.log(`[RSS] After date filter: ${allArticles.length}`);
+  }
+  
+  // Remove duplicates
+  allArticles = dedupeArticles(allArticles);
+  console.log(`[RSS] After deduplication: ${allArticles.length}`);
+  
+  // Sort by relevance score first, then by date
+  allArticles.sort((a, b) => {
+    const aContent = `${a.title} ${a.description}`.toLowerCase();
+    const bContent = `${b.title} ${b.description}`.toLowerCase();
+    
+    const aScore = isCorruptionRelated(aContent).score;
+    const bScore = isCorruptionRelated(bContent).score;
+    
+    if (aScore !== bScore) {
+      return bScore - aScore; // Higher score first
+    }
+    
+    // Then sort by date (newest first)
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
   });
-
-  let data = await fetchNewsApiBatch(withDomains);
-
-  if (!data.articles?.length || data.articles.length < Math.ceil(pageSize / 2)) {
-    const withDomainsTL = new URLSearchParams({
-      ...commonParams,
-      language: 'tl',
-      domains: PH_DOMAINS.join(','),
-      excludeDomains: EXCLUDE_DOMAINS.join(','),
-    });
-    try {
-      const tlData = await fetchNewsApiBatch(withDomainsTL);
-      data.articles = [...(data.articles || []), ...(tlData.articles || [])];
-    } catch {
-      // ignore
-    }
-  }
-
-  if (!data.articles?.length) {
-    const withoutDomains = new URLSearchParams({
-      ...commonParams,
-      language: 'en',
-      excludeDomains: EXCLUDE_DOMAINS.join(','),
-    });
-    data = await fetchNewsApiBatch(withoutDomains);
-  }
-
-  let items: NewsArticle[] = (data.articles || [])
-    .filter((article) => {
-      const url = (article.url as string) || '';
-      const host = getHostname(url);
-      if (EXCLUDE_DOMAINS.includes(host as (typeof EXCLUDE_DOMAINS)[number])) return false;
-      return isLocalOutlet((article.source as Record<string, unknown>)?.name as string, url);
-    })
-    .filter((article) =>
-      withinWindow(article.publishedAt as string, from, to)
-    )
-    .map((article): NewsArticle => ({
-      id: stableId('newsapi', article.url as string, article.title as string),
-      title: (article.title as string) || '',
-      description: (article.description as string) || '',
-      url: article.url as string,
-      urlToImage: (article.urlToImage as string) || undefined,
-      publishedAt: (article.publishedAt as string) || new Date().toISOString(),
-      source: {
-        name:
-          ((article.source as Record<string, unknown>)?.name as string) ||
-          guessSourceName(article.url as string),
-      },
-      category: normalizeCategoryKey(category),
-      content: (article.content as string) || '',
-    }));
-
-  items = dedupeArticles(items);
-  return items.slice(0, pageSize);
+  
+  console.log(`[RSS] Final filtered results: ${allArticles.length} articles`);
+  return allArticles.slice(0, pageSize);
 }
 
-// GET handler
+// ENHANCED: Better keyword matching for specific names
+const SPECIFIC_NAMES = [
+  'claudine co',
+  'gela marasigan', 
+  'gela alonte',
+  'vern enciso',
+  'verniece enciso', 
+  'jammy cruz',
+  'jasmine chan',
+  'christine lim'
+];
+
+// Enhanced corruption detection with name variants
+function isCorruptionRelated(content: string, targetCategory?: string): { 
+  isRelevant: boolean; 
+  detectedCategory: NewsArticle['category']; 
+  score: number;
+} {
+  const contentLower = content.toLowerCase();
+  
+  const categoryScores: Record<string, number> = {
+    'corrupt-politicians': 0,
+    'dpwh': 0,
+    'flood-control': 0,
+    'nepo-babies': 0
+  };
+  
+  // Special handling for the missing article pattern
+  if (contentLower.includes('cancel') && contentLower.includes('nepo')) {
+    categoryScores['nepo-babies'] += 5; // High score for "canceled nepo babies"
+  }
+  
+  // Check against all category keywords
+  Object.entries(UPDATED_CORRUPTION_KEYWORDS).forEach(([category, keywords]) => {
+    keywords.forEach(keyword => {
+      const keywordLower = keyword.toLowerCase();
+      
+      // Exact match
+      if (contentLower.includes(keywordLower)) {
+        categoryScores[category] += 1;
+        
+        // Extra bonus for multi-word phrases
+        if (keywordLower.includes(' ') && keywordLower.length > 8) {
+          categoryScores[category] += 1;
+        }
+        
+        // Specific name bonus
+        if (['claudine co', 'gela marasigan', 'gela alonte', 'vern enciso', 
+             'verniece enciso', 'jammy cruz', 'jasmine chan', 'christine lim'].includes(keywordLower)) {
+          categoryScores[category] += 3;
+        }
+        
+        // Key corruption terms bonus
+        if (['corruption', 'plunder', 'ghost project', 'kickback', 'malversation', 'dpwh'].includes(keywordLower)) {
+          categoryScores[category] += 2;
+        }
+      }
+      
+      // Partial matching for names
+      if (category === 'nepo-babies') {
+        const nameParts = keywordLower.split(' ');
+        if (nameParts.length >= 2) {
+          const allPartsPresent = nameParts.every(part => contentLower.includes(part));
+          if (allPartsPresent) {
+            categoryScores[category] += 2;
+          }
+        }
+      }
+    });
+  });
+  
+  // Find highest scoring category
+  const maxScore = Math.max(...Object.values(categoryScores));
+  const detectedCategory = Object.keys(categoryScores).find(
+    cat => categoryScores[cat] === maxScore
+  ) as NewsArticle['category'] || 'corrupt-politicians';
+  
+  // Even lower threshold for opinion pieces
+  const isRelevant = maxScore >= 1;
+  
+  return {
+    isRelevant,
+    detectedCategory,
+    score: maxScore
+  };
+}
+
+// BONUS: Add environment variable control for feed selection
+function getActiveFeedsFromConfig(): typeof PH_RSS_FEEDS {
+  const enabledFeeds = PH_RSS_FEEDS.filter(feed => {
+    // Allow environment variables to disable specific feeds
+    const envKey = `ENABLE_${feed.source.toUpperCase().replace(/[^A-Z]/g, '_')}`;
+    const isEnabled = process.env[envKey];
+    
+    // Default to enabled if no env var set
+    return isEnabled !== 'false';
+  });
+  
+  return enabledFeeds.length > 0 ? enabledFeeds : PH_RSS_FEEDS;
+}
+
+// Parameter parsing
+function parseParams(req: NextRequest) {
+  const sp = new URL(req.url).searchParams;
+  
+  const rawCategory = sp.get('category') || 'all';
+  const validCategories = ['all', 'flood-control', 'dpwh', 'corrupt-politicians', 'nepo-babies'];
+  const category = validCategories.includes(rawCategory) ? rawCategory : 'all';
+  
+  const query = sp.get('q');
+  const from = sp.get('from');
+  const to = sp.get('to');
+  
+  // Validate ISO dates
+  const isValidISODate = (dateStr: string | null): boolean => {
+    if (!dateStr) return false;
+    const date = new Date(dateStr);
+    return !isNaN(date.getTime());
+  };
+  
+  const fromIso = isValidISODate(from) ? from : null;
+  const toIso = isValidISODate(to) ? to : null;
+  
+  const page = Math.max(1, parseInt(sp.get('page') || '1') || 1);
+  const pageSize = Math.min(50, Math.max(1, parseInt(sp.get('pageSize') || '20') || 20));
+  
+  return { category, query, from: fromIso, to: toIso, page, pageSize };
+}
+
+// Main GET Handler
 export async function GET(request: NextRequest) {
   try {
     const { category, query, from, to, page, pageSize } = parseParams(request);
     const key = makeKey({ category, query, from, to, page, pageSize });
     const cached = getCached(key);
+    
+    // Return cached results if available
+    if (cached) {
+      console.log(`[CACHE] Returning cached results: ${cached.articles.length} articles`);
+      return NextResponse.json({
+        status: 'ok',
+        totalResults: cached.articles.length,
+        articles: cached.articles,
+        providerTrace: [...cached.providerTrace, 'cache:hit']
+      });
+    }
+    
     const trace: string[] = [];
-
     let articles: NewsArticle[] = [];
-
-    // 1) Gemini (optional)
-    const useGeminiSearch = process.env.USE_GEMINI_SEARCH === 'true';
-    if (useGeminiSearch) {
-      try {
-        const geminiItems = await searchWithGemini(category, query, from, to);
-        if (geminiItems.length) {
-          articles = geminiItems;
-          trace.push(`gemini:${articles.length}`);
-        }
-      } catch (err) {
-        console.warn('[Gemini] error:', err);
+    
+    // Use RSS as primary source (it's free!)
+    try {
+      articles = await searchWithRSS(category, query, from, to, pageSize);
+      if (articles.length > 0) {
+        trace.push(`rss:${articles.length}`);
       }
+    } catch (error) {
+      console.error('[RSS] Search failed:', error);
+      trace.push('rss:failed');
     }
-
-    // 2) Web search
-    if (!articles.length) {
-      try {
-        const webItems = await searchWithWeb(category, query, from, to, pageSize);
-        if (webItems.length) {
-          articles = webItems;
-          trace.push(`web:${articles.length}`);
-        }
-      } catch (err) {
-        console.warn('[Web] error:', err);
-      }
-    }
-
-    // 3) NewsAPI fallback
-    if (!articles.length) {
-      try {
-        const newsApiItems = await fallbackNewsAPISearch(category, query, from, to, page, pageSize);
-        if (newsApiItems.length) {
-          articles = newsApiItems;
-          trace.push(`newsapi:${articles.length}`);
-        }
-      } catch (err) {
-        console.warn('[NewsAPI] error:', err);
-      }
-    }
-
-    // 4) Sticky cache fallback
-    if (!articles.length && cached) {
-      articles = cached.articles;
-      trace.push('cache:hit');
-    }
-
-    if (articles.length) {
+    
+    // Cache successful results
+    if (articles.length > 0) {
       setCached(key, articles, trace);
     }
-
-    const payload: NewsResponse = {
+    
+    const response: NewsResponse = {
       status: 'ok',
       totalResults: articles.length,
       articles,
-      providerTrace: articles.length ? trace : cached?.providerTrace || trace,
+      providerTrace: trace
     };
-
-    return NextResponse.json(payload, {
+    
+    return NextResponse.json(response, {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-        Pragma: 'no-cache',
-      },
-    });
-  } catch (error) {
-    console.error('Error in corruption news API:', error);
-    return NextResponse.json(
-      {
-        status: 'error',
-        totalResults: 0,
-        articles: [],
-        error: (error as Error)?.message || 'Service unavailable - upstream providers failed',
-      },
-      {
-        status: 502,
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-          Pragma: 'no-cache',
-        },
+        'Cache-Control': 'public, max-age=300, s-maxage=300',
+        'X-Source': 'rss-feeds',
+        'X-Articles-Found': articles.length.toString()
       }
-    );
+    });
+    
+  } catch (error) {
+    console.error('[API] Fatal error:', error);
+    
+    return NextResponse.json({
+      status: 'error',
+      totalResults: 0,
+      articles: [],
+      error: 'RSS feed processing failed',
+      providerTrace: ['error:fatal']
+    }, { 
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      }
+    });
   }
-}
-
-// Gemini endpoint builder
-function getGeminiEndpoint() {
-  const base = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com';
-  const version = process.env.GEMINI_API_VERSION || 'v1beta';
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash'; // e.g. gemini-pro, gemini-1.5-flash
-  return `${base}/${version}/models/${model}:generateContent`;
 }
