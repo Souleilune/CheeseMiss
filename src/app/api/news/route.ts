@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 
+// Route/runtime config
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
+// Types
 export interface NewsArticle {
   id?: string;
   title: string;
@@ -23,9 +31,10 @@ export interface NewsResponse {
   articles: NewsArticle[];
   fallback?: boolean;
   error?: string;
+  providerTrace?: string[];
 }
 
-// Curated list of local Filipino outlets and domains
+// Curated PH outlets/domains
 const PH_OUTLETS = [
   'ABS-CBN News',
   'GMA News',
@@ -41,7 +50,7 @@ const PH_OUTLETS = [
   'Manila Standard',
   'One News PH',
   'Philippine News Agency (PNA)',
-];
+] as const;
 
 const PH_DOMAINS = [
   'news.abs-cbn.com',
@@ -58,7 +67,7 @@ const PH_DOMAINS = [
   'manilastandard.net',
   'onenews.ph',
   'pna.gov.ph',
-];
+] as const;
 
 const DOMAIN_TO_OUTLET: Record<string, string> = {
   'news.abs-cbn.com': 'ABS-CBN News',
@@ -88,9 +97,50 @@ const EXCLUDE_DOMAINS = [
   'x.com',
   'reddit.com',
   'youtube.com',
-];
+] as const;
 
-// Utils
+// Small in-memory sticky cache (60s) to avoid blanking UI on transient 0 results
+type CacheKey = string;
+const CACHE_TTL_MS = 60_000;
+const MAX_CACHE_ENTRIES = 100;
+const memoryCache = new Map<
+  CacheKey,
+  { ts: number; articles: NewsArticle[]; providerTrace: string[] }
+>();
+
+function makeKey(params: {
+  category: string;
+  query: string | null;
+  from: string | null;
+  to: string | null;
+  page: number;
+  pageSize: number;
+}): string {
+  return JSON.stringify(params);
+}
+
+function getCached(key: CacheKey) {
+  const entry = memoryCache.get(key);
+  if (entry && Date.now() - entry.ts < CACHE_TTL_MS) return entry;
+  return null;
+}
+
+function setCached(key: CacheKey, articles: NewsArticle[], providerTrace: string[]) {
+  memoryCache.set(key, { ts: Date.now(), articles, providerTrace });
+  if (memoryCache.size > MAX_CACHE_ENTRIES) {
+    let oldestKey: string | null = null;
+    let oldestTs = Infinity;
+    for (const [k, v] of memoryCache) {
+      if (v.ts < oldestTs) {
+        oldestTs = v.ts;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey) memoryCache.delete(oldestKey);
+  }
+}
+
+// Utilities
 const withinWindow = (iso: string, from?: string | null, to?: string | null) => {
   if (!from && !to) return true;
   const t = new Date(iso).getTime();
@@ -113,12 +163,11 @@ const guessSourceName = (url?: string, fallback?: string) => {
   return DOMAIN_TO_OUTLET[host] || fallback || host || 'Unknown';
 };
 
-const normalizeTitle = (t?: string) =>
-  (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+const normalizeTitle = (t?: string) => (t || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 const isLocalOutlet = (sourceName?: string, url?: string) => {
   const host = getHostname(url);
-  if (PH_DOMAINS.includes(host)) return true;
+  if (PH_DOMAINS.includes(host as (typeof PH_DOMAINS)[number])) return true;
   const src = (sourceName || '').toLowerCase();
   return (
     PH_OUTLETS.some((o) => o.toLowerCase() === src) ||
@@ -139,21 +188,17 @@ const isLocalOutlet = (sourceName?: string, url?: string) => {
 const dedupeArticles = (items: NewsArticle[]) => {
   const byUrl = new Map<string, NewsArticle>();
   const byTitle = new Map<string, NewsArticle>();
-
   for (const a of items) {
     const keyUrl = (a.url || '').split('?')[0];
     const keyTitle = normalizeTitle(a.title);
     const host = getHostname(a.url);
-
-    if (EXCLUDE_DOMAINS.includes(host)) continue;
-
+    if (EXCLUDE_DOMAINS.includes(host as (typeof EXCLUDE_DOMAINS)[number])) continue;
     if (keyUrl && !byUrl.has(keyUrl)) {
       byUrl.set(keyUrl, a);
     } else if (keyTitle && !byTitle.has(keyTitle)) {
       byTitle.set(keyTitle, a);
     }
   }
-
   const merged = Array.from(byUrl.values());
   for (const [t, art] of byTitle) {
     if (!merged.find((m) => normalizeTitle(m.title) === t)) {
@@ -163,9 +208,78 @@ const dedupeArticles = (items: NewsArticle[]) => {
   return merged;
 };
 
-// Category -> keyword query
+// Category typing/guard
+const CATEGORY_VALUES = [
+  'flood-control',
+  'dpwh',
+  'corrupt-politicians',
+  'nepo-babies',
+] as const;
+type CategoryKey = typeof CATEGORY_VALUES[number];
+function isCategory(val: string): val is CategoryKey {
+  return (CATEGORY_VALUES as readonly string[]).includes(val);
+}
+function normalizeCategoryKey(cat: string): NewsArticle['category'] {
+  return isCategory(cat) ? cat : 'corrupt-politicians';
+}
+
+// Stable IDs from URL/title
+function stableId(prefix: string, url?: string, fallbackKey?: string) {
+  const key = url || fallbackKey || Math.random().toString(36);
+  const hash = createHash('sha1').update(key).digest('hex').slice(0, 16);
+  return `${prefix}_${hash}`;
+}
+
+// Param parsing/validation
+function parseParams(req: NextRequest) {
+  const sp = new URL(req.url).searchParams;
+  const rawCategory = sp.get('category') || 'all';
+  const category = (['all', ...CATEGORY_VALUES] as readonly string[]).includes(rawCategory)
+    ? (rawCategory as 'all' | NewsArticle['category'])
+    : 'all';
+
+  const q = sp.get('q');
+
+  const from = sp.get('from');
+  const to = sp.get('to');
+  const isIso = (v: string | null) => !v || !Number.isNaN(new Date(v).getTime());
+  const fromIso = isIso(from) ? from : null;
+  const toIso = isIso(to) ? to : null;
+
+  let page = Number(sp.get('page') || '1');
+  if (!Number.isFinite(page) || page < 1) page = 1;
+
+  let pageSize = Number(sp.get('pageSize') || '20');
+  if (!Number.isFinite(pageSize)) pageSize = 20;
+  pageSize = Math.min(50, Math.max(1, pageSize)); // clamp 1–50
+
+  return { category, query: q, from: fromIso, to: toIso, page, pageSize };
+}
+
+// Helper: timed JSON fetch
+async function fetchJsonWithTimeout<T>(url: string, init: RequestInit, timeoutMs: number): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      cache: 'no-store',
+      next: { revalidate: 0 },
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`${res.status} ${res.statusText}${errText ? `: ${errText}` : ''}`);
+    }
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Build query by category
 function buildCategoryQuery(category: string, userQuery?: string | null) {
-  const base: Record<string, string> = {
+  const base: Record<CategoryKey, string> = {
     'flood-control':
       'Philippines ("flood control" OR dike OR embankment) (ghost project OR corruption OR scam OR kickback OR overprice OR audit) DPWH',
     dpwh:
@@ -178,22 +292,11 @@ function buildCategoryQuery(category: string, userQuery?: string | null) {
   const q =
     category === 'all'
       ? 'Philippines corruption DPWH flood control politician "ghost project"'
-      : base[category as keyof typeof base] || base['corrupt-politicians'];
+      : base[(category as CategoryKey) in base ? (category as CategoryKey) : 'corrupt-politicians'];
   return userQuery ? `${q} ${userQuery}` : q;
 }
 
-// Normalize category (avoid writing invalid "all" into items)
-function normalizeCategoryKey(cat: string): NewsArticle['category'] {
-  const allowed = new Set<NewsArticle['category']>([
-    'flood-control',
-    'dpwh',
-    'corrupt-politicians',
-    'nepo-babies',
-  ]);
-  return (allowed.has(cat as any) ? (cat as any) : 'corrupt-politicians') as NewsArticle['category'];
-}
-
-// Gemini prompt — PH-only, mix recent + older references
+// Gemini prompt
 function getGeminiSearchPrompt(
   category: string,
   query?: string,
@@ -203,7 +306,6 @@ function getGeminiSearchPrompt(
   const outlets = PH_OUTLETS.join(', ');
   const domains = PH_DOMAINS.join(', ');
   const exclude = EXCLUDE_DOMAINS.join(', ');
-
   const timeScope =
     from && to
       ? `Time window: between ${from} and ${to}.`
@@ -288,7 +390,7 @@ OLDER_REFERENCE: yes/no`;
   return prompt;
 }
 
-// Parse Gemini structured text into NewsArticle[]
+// Parse Gemini text to articles
 function parseGeminiResponse(text: string, category: string): NewsArticle[] {
   if (!text) return [];
   const blocks = text
@@ -297,7 +399,6 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
     .filter(Boolean);
 
   const items: NewsArticle[] = [];
-
   for (const block of blocks) {
     const get = (label: string) =>
       (block.match(new RegExp(`${label}\\s*:\\s*(.+)`, 'i')) || [])[1]?.trim();
@@ -313,11 +414,10 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
       if (urlMatch) url = urlMatch[0];
     }
 
-    // Normalize date safely
     let publishedAt: string;
     try {
       const dateObj = new Date(date);
-      if (isNaN(dateObj.getTime())) throw new Error('Invalid date');
+      if (Number.isNaN(dateObj.getTime())) throw new Error('Invalid date');
       publishedAt = dateObj.toISOString();
     } catch {
       const dMatch = block.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
@@ -338,7 +438,7 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
     const description = get('DESCRIPTION') || 'No description provided.';
 
     const item: NewsArticle = {
-      id: `gemini_${Buffer.from((url || title).slice(0, 80)).toString('base64')}`,
+      id: stableId('gemini', url, title),
       title,
       description,
       url,
@@ -355,7 +455,13 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
   return dedupeArticles(items);
 }
 
-// Gemini search (parsing + PH filter + date window)
+// Gemini types
+type GeminiPart = { text?: string };
+type GeminiContent = { parts?: GeminiPart[] };
+type GeminiCandidate = { content?: GeminiContent };
+type GeminiResponse = { candidates?: GeminiCandidate[] };
+
+// Fetch Gemini
 async function searchWithGemini(
   category: string,
   query?: string | null,
@@ -363,47 +469,52 @@ async function searchWithGemini(
   to?: string | null
 ): Promise<NewsArticle[]> {
   const apiKey = process.env.GEMINI_API_KEY;
-  const configuredUrl = process.env.GEMINI_API_URL; // optional full :generateContent path
+  const configuredUrl = process.env.GEMINI_API_URL; // optional full path to :generateContent
   if (!apiKey) throw new Error('Gemini API key missing');
 
   const url = `${configuredUrl || getGeminiEndpoint()}?key=${apiKey}`;
-  const prompt = getGeminiSearchPrompt(
-    category,
-    query || undefined,
-    from || undefined,
-    to || undefined
+  const prompt = getGeminiSearchPrompt(category, query || undefined, from || undefined, to || undefined);
+  const data = await fetchJsonWithTimeout<GeminiResponse>(
+    url,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    },
+    8000
   );
-  const requestBody = { contents: [{ parts: [{ text: prompt }] }] };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`Gemini API responded with ${response.status}${errText ? `: ${errText}` : ''}`);
-  }
-
-  const data = (await response.json().catch(() => ({}))) as any;
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   let items = parseGeminiResponse(text, category);
-
-  // Respect date window
   items = items.filter((a) => withinWindow(a.publishedAt, from, to));
-
-  // If nothing returned, throw to trigger web/NewsAPI fallback
-  if (items.length === 0) {
-    throw new Error('Gemini returned no items');
-  }
-
   return items.slice(0, 15);
 }
 
-// WEB SEARCH PROVIDERS
+// Tavily types/payload
+type TavilyResult = {
+  title?: string;
+  url?: string;
+  source?: string;
+  content?: string;
+  snippet?: string;
+  published_date?: string;
+};
+type TavilyResponse = { results?: TavilyResult[] };
+type TavilyPayload = {
+  api_key: string;
+  query: string;
+  search_depth: 'basic' | 'advanced';
+  include_domains?: readonly string[];
+  exclude_domains?: readonly string[];
+  max_results: number;
+  include_answer: boolean;
+  include_raw_content: boolean;
+  include_images: boolean;
+  language?: string;
+  time_range?: 'day' | 'week' | 'month' | 'year';
+};
 
-// 1) Tavily
+// Tavily (with widen retry)
 async function webSearchTavily(
   category: string,
   userQuery?: string | null,
@@ -414,8 +525,7 @@ async function webSearchTavily(
   const key = process.env.TAVILY_API_KEY;
   if (!key) throw new Error('Tavily API not configured');
 
-  // Valid values: 'day' | 'week' | 'month' | 'year'
-  let time_range: 'day' | 'week' | 'month' | 'year' | undefined = undefined;
+  let time_range: TavilyPayload['time_range'] | undefined = undefined;
   if (from || to) {
     const start = from ? new Date(from).getTime() : Date.now() - 365 * 24 * 60 * 60 * 1000;
     const end = to ? new Date(to).getTime() : Date.now();
@@ -426,8 +536,7 @@ async function webSearchTavily(
   }
 
   const query = buildCategoryQuery(category, userQuery);
-
-  const payload: Record<string, unknown> = {
+  const basePayload: TavilyPayload = {
     api_key: key,
     query,
     search_depth: 'advanced',
@@ -438,50 +547,80 @@ async function webSearchTavily(
     include_raw_content: false,
     include_images: false,
     language: 'en',
+    time_range,
   };
-  if (time_range) payload.time_range = time_range;
 
-  const res = await fetch('https://api.tavily.com/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+  const run = async (payload: TavilyPayload) =>
+    fetchJsonWithTimeout<TavilyResponse>('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, 8000);
+
+  // Pass 1: with include_domains
+  let data = await run(basePayload);
+
+  let mapped: NewsArticle[] = (data.results || []).map((r, i): NewsArticle => {
+    const publishedAt = r.published_date ? new Date(r.published_date).toISOString() : new Date().toISOString();
+    const sourceName = guessSourceName(r.url, r.source);
+    return {
+      id: stableId('tavily', r.url, r.title),
+      title: r.title || '',
+      description: r.content || r.snippet || 'No description.',
+      url: r.url,
+      urlToImage: undefined,
+      publishedAt,
+      source: { name: sourceName },
+      category: normalizeCategoryKey(category),
+      content: r.snippet || r.content || '',
+    };
   });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Tavily responded with ${res.status}${errText ? `: ${errText}` : ''}`);
-  }
+  let items = mapped
+    .filter((a) => isLocalOutlet(a.source.name, a.url))
+    .filter((a) => withinWindow(a.publishedAt, from, to));
 
-  const data = (await res.json()) as { results?: Array<Record<string, unknown>> };
-
-  const mapped: NewsArticle[] = (data.results || []).map(
-    (r: Record<string, unknown>, i: number): NewsArticle => {
-        const publishedAt = (r.published_date as string)
-        ? new Date(r.published_date as string).toISOString()
-        : new Date().toISOString();
-        const sourceName = guessSourceName(r.url as string, r.source as string);
-        return {
-        id: `tavily_${Date.now()}_${i}`,
-        title: r.title as string,
-        description: (r.content as string) || (r.snippet as string) || 'No description.',
-        url: r.url as string,
+  // Pass 2: widen if empty
+  if (!items.length) {
+    const widened: TavilyPayload = { ...basePayload };
+    delete widened.include_domains;
+    data = await run(widened);
+    mapped = (data.results || []).map((r, i): NewsArticle => {
+      const publishedAt = r.published_date ? new Date(r.published_date).toISOString() : new Date().toISOString();
+      const sourceName = guessSourceName(r.url, r.source);
+      return {
+        id: stableId('tavily', r.url, r.title),
+        title: r.title || '',
+        description: r.content || r.snippet || 'No description.',
+        url: r.url,
         urlToImage: undefined,
         publishedAt,
         source: { name: sourceName },
         category: normalizeCategoryKey(category),
-        content: (r.snippet as string) || (r.content as string),
-        };
-    }
-    );
+        content: r.snippet || r.content || '',
+      };
+    });
 
-    const items = mapped
-    .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
-    .filter((a: NewsArticle) => withinWindow(a.publishedAt, from, to));
+    items = mapped
+      .filter((a) => isLocalOutlet(a.source.name, a.url))
+      .filter((a) => withinWindow(a.publishedAt, from, to));
+  }
 
-    return dedupeArticles(items).slice(0, pageSize);
+  return dedupeArticles(items).slice(0, pageSize);
 }
 
-// 2) Serper.dev (Google News)
+// Serper types
+type SerperNewsItem = {
+  title?: string;
+  snippet?: string;
+  link?: string;
+  source?: string;
+  date?: string;
+  imageUrl?: string;
+};
+type SerperNewsResponse = { news?: SerperNewsItem[] };
+
+// Serper (Google News)
 async function webSearchSerper(
   category: string,
   userQuery?: string | null,
@@ -496,53 +635,46 @@ async function webSearchSerper(
   const siteFilter = PH_DOMAINS.map((d) => `site:${d}`).join(' OR ');
   const q = `${buildCategoryQuery(category, userQuery)} ${siteFilter}`;
 
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'X-API-KEY': key,
-      'Content-Type': 'application/json',
+  const data = await fetchJsonWithTimeout<SerperNewsResponse>(
+    endpoint,
+    {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': key,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q,
+        gl: 'ph',
+        hl: 'en',
+        num: Math.min(20, Math.max(10, pageSize)),
+        autocorrect: true,
+      }),
     },
-    body: JSON.stringify({
-      q,
-      gl: 'ph',
-      hl: 'en',
-      num: Math.min(20, Math.max(10, pageSize)),
-      autocorrect: true,
-    }),
+    8000
+  );
+
+  const mapped: NewsArticle[] = (data.news || []).map((r, i): NewsArticle => {
+    const publishedAt = r.date ? new Date(r.date).toISOString() : new Date().toISOString();
+    const sourceName = guessSourceName(r.link, r.source);
+    return {
+      id: stableId('serper', r.link, r.title),
+      title: r.title || '',
+      description: r.snippet || 'No description.',
+      url: r.link,
+      urlToImage: r.imageUrl,
+      publishedAt,
+      source: { name: sourceName },
+      category: normalizeCategoryKey(category),
+      content: r.snippet || '',
+    };
   });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Serper responded with ${res.status}${errText ? `: ${errText}` : ''}`);
-  }
-  const data = await res.json();
+  const items = mapped
+    .filter((a) => isLocalOutlet(a.source.name, a.url))
+    .filter((a) => withinWindow(a.publishedAt, from, to));
 
-  const mapped: NewsArticle[] = (data?.news || []).map(
-    (r: Record<string, unknown>, i: number): NewsArticle => {
-        const publishedAt = (r.date as string)
-        ? new Date(r.date as string).toISOString()
-        : new Date().toISOString();
-        const sourceName = guessSourceName(r.link as string, r.source as string);
-
-        return {
-        id: `serper_${Date.now()}_${i}`,
-        title: r.title as string,
-        description: (r.snippet as string) || 'No description.',
-        url: r.link as string,
-        urlToImage: (r as any).imageUrl as string,
-        publishedAt,
-        source: { name: sourceName },
-        category: normalizeCategoryKey(category),
-        content: r.snippet as string,
-        };
-    }
-    );
-
-    const items = mapped
-    .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
-    .filter((a: NewsArticle) => withinWindow(a.publishedAt, from, to));
-
-    return dedupeArticles(items).slice(0, pageSize);
+  return dedupeArticles(items).slice(0, pageSize);
 }
 
 // Orchestrator: try web providers in order
@@ -556,21 +688,15 @@ async function searchWithWeb(
   const preferred = (process.env.WEB_SEARCH_PROVIDER || '').toLowerCase();
 
   const tryOrder: Array<() => Promise<NewsArticle[]>> = [];
-
   const hasTavily = !!process.env.TAVILY_API_KEY;
   const hasSerper = !!process.env.SERPER_API_KEY;
 
   const pushByName = (name: string) => {
-    if (name === 'tavily' && hasTavily) {
-      tryOrder.push(() => webSearchTavily(category, query, from, to, pageSize));
-    }
-    if (name === 'serper' && hasSerper) {
-      tryOrder.push(() => webSearchSerper(category, query, from, to, pageSize));
-    }
+    if (name === 'tavily' && hasTavily) tryOrder.push(() => webSearchTavily(category, query, from, to, pageSize));
+    if (name === 'serper' && hasSerper) tryOrder.push(() => webSearchSerper(category, query, from, to, pageSize));
   };
 
   if (preferred) pushByName(preferred);
-
   if (tryOrder.length === 0) {
     if (hasTavily) tryOrder.push(() => webSearchTavily(category, query, from, to, pageSize));
     if (hasSerper) tryOrder.push(() => webSearchSerper(category, query, from, to, pageSize));
@@ -583,7 +709,7 @@ async function searchWithWeb(
     try {
       const res = await fn();
       collected = dedupeArticles([...collected, ...res]);
-      if (collected.length) break; // Stop on first provider that yields items
+      if (collected.length) break;
     } catch (e) {
       if (!firstError) firstError = e;
     }
@@ -593,17 +719,16 @@ async function searchWithWeb(
     if (firstError) throw firstError;
     throw new Error('No web search provider available or returned results.');
   }
-
   return collected;
 }
 
-// NewsAPI (kept as a fallback)
+// NewsAPI fallback
 async function fetchNewsApiBatch(params: URLSearchParams) {
-  const response = await fetch(
-    `https://newsapi.org/v2/everything?${params.toString()}`
+  return fetchJsonWithTimeout<{ articles?: Array<Record<string, unknown>> }>(
+    `https://newsapi.org/v2/everything?${params.toString()}`,
+    { method: 'GET' },
+    8000
   );
-  if (!response.ok) throw new Error(`NewsAPI responded with ${response.status}`);
-  return response.json() as Promise<{ articles?: Array<Record<string, unknown>> }>;
 }
 
 async function fallbackNewsAPISearch(
@@ -618,7 +743,6 @@ async function fallbackNewsAPISearch(
   if (!apiKey) throw new Error('NewsAPI not configured');
 
   const searchQuery = buildCategoryQuery(category, query);
-
   const commonParams: Record<string, string> = {
     apiKey,
     q: searchQuery,
@@ -627,8 +751,8 @@ async function fallbackNewsAPISearch(
     pageSize: String(pageSize),
     searchIn: 'title,description,content',
   };
-  if (from) commonParams.from = from!;
-  if (to) commonParams.to = to!;
+  if (from) commonParams.from = from;
+  if (to) commonParams.to = to;
 
   const withDomains = new URLSearchParams({
     ...commonParams,
@@ -649,7 +773,9 @@ async function fallbackNewsAPISearch(
     try {
       const tlData = await fetchNewsApiBatch(withDomainsTL);
       data.articles = [...(data.articles || []), ...(tlData.articles || [])];
-    } catch {}
+    } catch {
+      // ignore
+    }
   }
 
   if (!data.articles?.length) {
@@ -662,125 +788,128 @@ async function fallbackNewsAPISearch(
   }
 
   let items: NewsArticle[] = (data.articles || [])
-    .filter((article: Record<string, unknown>) => {
+    .filter((article) => {
       const url = (article.url as string) || '';
       const host = getHostname(url);
-      if (EXCLUDE_DOMAINS.includes(host)) return false;
+      if (EXCLUDE_DOMAINS.includes(host as (typeof EXCLUDE_DOMAINS)[number])) return false;
       return isLocalOutlet((article.source as Record<string, unknown>)?.name as string, url);
     })
-    .filter((article: Record<string, unknown>) =>
-      withinWindow(article.publishedAt as string, from, to)
-    )
-    .map((article: Record<string, unknown>, index: number) => ({
-      id: `newsapi_${Date.now()}_${index}`,
-      title: article.title as string,
-      description: article.description as string,
+    .filter((article) => withinWindow(article.publishedAt as string, from, to))
+    .map((article, index): NewsArticle => ({
+      id: stableId('newsapi', article.url as string, article.title as string),
+      title: (article.title as string) || '',
+      description: (article.description as string) || '',
       url: article.url as string,
-      urlToImage: article.urlToImage as string,
-      publishedAt: article.publishedAt as string,
+      urlToImage: (article.urlToImage as string) || undefined,
+      publishedAt: (article.publishedAt as string) || new Date().toISOString(),
       source: {
-        name:
-          ((article.source as Record<string, unknown>)?.name as string) ||
-          guessSourceName(article.url as string),
+        name: ((article.source as Record<string, unknown>)?.name as string) || guessSourceName(article.url as string),
       },
       category: normalizeCategoryKey(category),
-      content: article.content as string,
+      content: (article.content as string) || '',
     }));
 
   items = dedupeArticles(items);
   return items.slice(0, pageSize);
 }
 
+// GET handler
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const category = (searchParams.get('category') || 'all') as
-      | 'all'
-      | NewsArticle['category'];
-    const query = searchParams.get('q');
-
-    const from = searchParams.get('from');
-    const to = searchParams.get('to');
-    const page = Number(searchParams.get('page') || '1');
-    const pageSize = Number(searchParams.get('pageSize') || '20');
-
-    console.log('Searching for Filipino corruption news:', {
-      category,
-      query,
-      from,
-      to,
-      page,
-      pageSize,
-    });
-
-    const useGeminiSearch = process.env.USE_GEMINI_SEARCH === 'true';
+    const { category, query, from, to, page, pageSize } = parseParams(request);
+    const key = makeKey({ category, query, from, to, page, pageSize });
+    const cached = getCached(key);
+    const trace: string[] = [];
 
     let articles: NewsArticle[] = [];
 
+    // 1) Gemini (optional)
+    const useGeminiSearch = process.env.USE_GEMINI_SEARCH === 'true';
     if (useGeminiSearch) {
       try {
-        articles = await searchWithGemini(category, query, from, to);
-      } catch (geminiError) {
-        console.error('Gemini search failed:', geminiError);
-        try {
-          // Web search layer
-          articles = await searchWithWeb(category, query, from, to, pageSize);
-        } catch (webError) {
-          console.error('Web search failed:', webError);
-          // NewsAPI fallback
-          articles = await fallbackNewsAPISearch(
-            category,
-            query,
-            from,
-            to,
-            page,
-            pageSize
-          );
+        const geminiItems = await searchWithGemini(category, query, from, to);
+        if (geminiItems.length) {
+          articles = geminiItems;
+          trace.push(`gemini:${articles.length}`);
         }
-      }
-    } else {
-      // Prefer web search first if available, then NewsAPI
-      try {
-        articles = await searchWithWeb(category, query, from, to, pageSize);
-      } catch (webError) {
-        console.error('Web search failed:', webError);
-        articles = await fallbackNewsAPISearch(
-          category,
-          query,
-          from,
-          to,
-          page,
-          pageSize
-        );
+      } catch (err) {
+        console.warn('[Gemini] error:', err);
       }
     }
 
-    return NextResponse.json({
+    // 2) Web search
+    if (!articles.length) {
+      try {
+        const webItems = await searchWithWeb(category, query, from, to, pageSize);
+        if (webItems.length) {
+          articles = webItems;
+          trace.push(`web:${articles.length}`);
+        }
+      } catch (err) {
+        console.warn('[Web] error:', err);
+      }
+    }
+
+    // 3) NewsAPI fallback
+    if (!articles.length) {
+      try {
+        const newsApiItems = await fallbackNewsAPISearch(category, query, from, to, page, pageSize);
+        if (newsApiItems.length) {
+          articles = newsApiItems;
+          trace.push(`newsapi:${articles.length}`);
+        }
+      } catch (err) {
+        console.warn('[NewsAPI] error:', err);
+      }
+    }
+
+    // 4) Sticky cache fallback
+    if (!articles.length && cached) {
+      articles = cached.articles;
+      trace.push('cache:hit');
+    }
+
+    if (articles.length) {
+      setCached(key, articles, trace);
+    }
+
+    const payload: NewsResponse = {
       status: 'ok',
       totalResults: articles.length,
       articles,
+      providerTrace: articles.length ? trace : cached?.providerTrace || trace,
+    };
+
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        Pragma: 'no-cache',
+      },
     });
   } catch (error) {
     console.error('Error in corruption news API:', error);
-
-    // Return error (no mock fallback)
     return NextResponse.json(
       {
         status: 'error',
         totalResults: 0,
         articles: [],
-        error:
-          (error as Error)?.message ||
-          'Service unavailable - upstream providers failed',
+        error: (error as Error)?.message || 'Service unavailable - upstream providers failed',
       },
-      { status: 502 }
+      {
+        status: 502,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          Pragma: 'no-cache',
+        },
+      }
     );
   }
 }
 
+// Gemini endpoint builder
 function getGeminiEndpoint() {
   const base = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com';
   const version = process.env.GEMINI_API_VERSION || 'v1beta';
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash'; // e.g. gemini-pro, gemini-1.5-flash, gemini-1.5-flash-8b
+  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash'; // e.g. gemini-pro, gemini-1.5-flash
   return `${base}/${version}/models/${model}:generateContent`;
 }
