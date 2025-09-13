@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import Image from 'next/image';
 import type { LucideIcon } from 'lucide-react';
 import {
   Search,
@@ -25,7 +26,7 @@ import {
 } from 'lucide-react';
 // FIXED: Removed unused imports: Heart, MessageCircle, Bookmark
 
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&h=800&fit=crop&q=80';
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=600&fit=crop&q=80';
 
 type Article = {
   id: number | string;
@@ -599,13 +600,18 @@ const CheeseMiss = () => {
         onKeyDown={(e) => e.key === 'Enter' && handleArticleClick()}
       >
         <div className="relative">
-          <img
+          <Image
             src={article.urlToImage || FALLBACK_IMAGE}
             alt={article.title}
-            onError={(e) => ((e.currentTarget as HTMLImageElement).src = FALLBACK_IMAGE)}
+            width={400}
+            height={176}
             className="w-full h-44 object-cover"
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.src = FALLBACK_IMAGE;
+            }}
           />
-          
+                    
           {/* External link indicator */}
           {article.url && (
             <div className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-black/50 text-white grid place-items-center backdrop-blur-sm">
@@ -743,11 +749,16 @@ const CheeseMiss = () => {
           </button>
 
           <article className="bg-white rounded-xl overflow-hidden">
-            <img
+            <Image
               src={selectedArticle.urlToImage || FALLBACK_IMAGE}
               alt={selectedArticle.title}
-              onError={(e) => ((e.currentTarget as HTMLImageElement).src = FALLBACK_IMAGE)}
+              width={800}
+              height={256}
               className="w-full h-64 object-cover"
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.src = FALLBACK_IMAGE;
+              }}
             />
 
             <div className="p-6">

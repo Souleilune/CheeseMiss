@@ -163,114 +163,6 @@ const dedupeArticles = (items: NewsArticle[]) => {
   return merged;
 };
 
-// Enhanced mock data (same as before)
-const mockNews: NewsArticle[] = [
-  {
-    id: '1',
-    title:
-      'DPWH Flood Control Project sa Pampanga: ₱8.5B Budget, Walang Natayong Infrastructure',
-    description:
-      'Ang malaking flood control project sa Pampanga na may budget na ₱8.5 billion ay naging ghost project. Contractors nakakuha ng pera pero walang actual construction na nangyari.',
-    urlToImage:
-      'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=800&h=500&fit=crop',
-    publishedAt: new Date().toISOString(),
-    source: { name: 'Philippine Daily Inquirer' },
-    category: 'flood-control',
-    url: 'https://inquirer.net/ghost-project-pampanga',
-  },
-  {
-    id: '2',
-    title:
-      'DPWH Undersecretary na may ₱2.3B sa Swiss Bank, Naaresto na sa NAIA',
-    description:
-      'Si Undersecretary Roberto Santos ng DPWH ay naaresto sa airport habang paalis ng bansa. May nakitang ₱2.3 billion sa Swiss bank account na hindi niya ma-explain.',
-    urlToImage:
-      'https://images.unsplash.com/photo-1594736797933-d0ea5d3a0db4?w=800&h=500&fit=crop',
-    publishedAt: new Date(Date.now() - 3600000).toISOString(),
-    source: { name: 'Rappler' },
-    category: 'dpwh',
-    url: 'https://rappler.com/dpwh-undersecretary-arrest',
-  },
-  {
-    id: '3',
-    title:
-      "Senator Villanueva's Son: ₱45M Lamborghini Collection, Pina-post sa Instagram",
-    description:
-      'Ang 22-year-old na anak ni Senator Villanueva ay nag-post sa Instagram ng kanyang Lamborghini collection na nagkakahalaga ng ₱45 million. Walang declared income ang bata.',
-    urlToImage:
-      'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=800&h=500&fit=crop',
-    publishedAt: new Date(Date.now() - 7200000).toISOString(),
-    source: { name: 'ABS-CBN News' },
-    category: 'nepo-babies',
-    url: 'https://abs-cbn.com/senator-son-lamborghini',
-  },
-  {
-    id: '4',
-    title:
-      'Governor Santos ng Bataan: May ₱12B Ghost Flood Control Projects, Under Investigation',
-    description:
-      'Nalaman na ang 15 flood control projects sa Bataan na may combined budget na ₱12 billion ay lahat ghost projects. Walang actual infrastructure na natayo.',
-    urlToImage:
-      'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&h=500&fit=crop',
-    publishedAt: new Date(Date.now() - 10800000).toISOString(),
-    source: { name: 'Manila Bulletin' },
-    category: 'corrupt-politicians',
-    url: 'https://mb.com.ph/bataan-ghost-projects',
-  },
-  {
-    id: '5',
-    title:
-      "Mayor Rodriguez's Daughter: Nag-shopping sa Paris ₱8M, Naka-post sa TikTok",
-    description:
-      'Ang 19-year-old na anak ni Mayor Rodriguez ng Quezon City ay nag-viral sa TikTok dahil sa ₱8 million shopping spree sa Paris. Ang mayor ay may minimum wage lang na sahod.',
-    urlToImage:
-      'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=800&h=500&fit=crop',
-    publishedAt: new Date(Date.now() - 14400000).toISOString(),
-    source: { name: 'GMA News' },
-    category: 'nepo-babies',
-    url: 'https://gmanetwork.com/mayor-daughter-shopping',
-  },
-  {
-    id: '6',
-    title:
-      'Cagayan Flood Control Scam: ₱25B Budget, 80% Ghost Projects Discovered',
-    description:
-      'Sa Cagayan province, natuklasan na 80% ng flood control projects na may total budget na ₱25 billion ay ghost projects. Contractors ay kumita ng malaki sa walang ginawang trabaho.',
-    urlToImage:
-      'https://images.unsplash.com/photo-1574263867128-a3d5c1b1deac?w=800&h=500&fit=crop',
-    publishedAt: new Date(Date.now() - 18000000).toISOString(),
-    source: { name: 'CNN Philippines' },
-    category: 'flood-control',
-    url: 'https://cnnphilippines.com/cagayan-flood-scam',
-  },
-  {
-    id: '7',
-    title:
-      'DPWH Engineer na Nag-amass ng ₱500M Properties, Nahuli sa Lifestyle Check',
-    description:
-      'Isang DPWH engineer na may sahod na ₱45,000 monthly ay nahuli na may ₱500 million worth ng properties sa Makati, BGC, at Alabang.',
-    urlToImage:
-      'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&h=500&fit=crop',
-    publishedAt: new Date(Date.now() - 21600000).toISOString(),
-    source: { name: 'BusinessWorld Philippines' },
-    category: 'dpwh',
-    url: 'https://businessworld.com.ph/dpwh-engineer-wealth',
-  },
-  {
-    id: '8',
-    title:
-      "Congressman Martinez's Son: Bumili ng ₱85M Penthouse, Nag-house tour sa YouTube",
-    description:
-      'Ang 25-year-old na anak ni Congressman Martinez ay nag-upload ng house tour ng kanyang ₱85 million penthouse sa Bonifacio Global City. Walang legitimate business ang bata.',
-    urlToImage:
-      'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&h=500&fit=crop',
-    publishedAt: new Date(Date.now() - 25200000).toISOString(),
-    source: { name: 'Philippine Star' },
-    category: 'nepo-babies',
-    url: 'https://philstar.com/congressman-son-penthouse',
-  },
-];
-
 // Category -> keyword query
 function buildCategoryQuery(category: string, userQuery?: string | null) {
   const base: Record<string, string> = {
@@ -283,12 +175,31 @@ function buildCategoryQuery(category: string, userQuery?: string | null) {
     'nepo-babies':
       'Philippines (political dynasty OR "nepo baby" OR "politician son" OR "politician daughter") (Instagram OR TikTok OR luxury OR Lamborghini OR penthouse OR "shopping spree")',
   };
-  const q = category === 'all' ? 'Philippines corruption DPWH flood control politician "ghost project"' : base[category as keyof typeof base] || base['corrupt-politicians'];
+  const q =
+    category === 'all'
+      ? 'Philippines corruption DPWH flood control politician "ghost project"'
+      : base[category as keyof typeof base] || base['corrupt-politicians'];
   return userQuery ? `${q} ${userQuery}` : q;
 }
 
+// Normalize category (avoid writing invalid "all" into items)
+function normalizeCategoryKey(cat: string): NewsArticle['category'] {
+  const allowed = new Set<NewsArticle['category']>([
+    'flood-control',
+    'dpwh',
+    'corrupt-politicians',
+    'nepo-babies',
+  ]);
+  return (allowed.has(cat as any) ? (cat as any) : 'corrupt-politicians') as NewsArticle['category'];
+}
+
 // Gemini prompt — PH-only, mix recent + older references
-function getGeminiSearchPrompt(category: string, query?: string, from?: string | null, to?: string | null): string {
+function getGeminiSearchPrompt(
+  category: string,
+  query?: string,
+  from?: string | null,
+  to?: string | null
+): string {
   const outlets = PH_OUTLETS.join(', ');
   const domains = PH_DOMAINS.join(', ');
   const exclude = EXCLUDE_DOMAINS.join(', ');
@@ -337,6 +248,15 @@ ${commonRules}`,
 Focus:
 - Children/relatives flaunting wealth; luxury cars/shopping/vacations vs parent’s salary.
 - Dynasties with multiple offices.
+- Include the following public figures as search hints ONLY IF there is coverage by reputable Filipino outlets (skip if no credible reporting; avoid gossip/defamation):
+  - Claudine Co
+  - Gela Marasigan
+  - Gela Alonte
+  - Vern Enciso
+  - Verniece Enciso
+  - Jammy Cruz
+  - Jasmine Chan
+  - Christine Lim
 ${commonRules}`,
   };
 
@@ -385,7 +305,7 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
     const title = get('TITLE');
     const sourceName = get('SOURCE');
     let url = get('URL');
-    let date = get('DATE') || '';
+    const date = get('DATE') || '';
 
     if (!title) continue;
     if (!url) {
@@ -393,17 +313,13 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
       if (urlMatch) url = urlMatch[0];
     }
 
-    // Normalize date - Fixed: Check if date is valid before calling toISOString()
+    // Normalize date safely
     let publishedAt: string;
     try {
       const dateObj = new Date(date);
-      // Check if the date is valid before calling toISOString()
-      if (isNaN(dateObj.getTime())) {
-        throw new Error('Invalid date');
-      }
+      if (isNaN(dateObj.getTime())) throw new Error('Invalid date');
       publishedAt = dateObj.toISOString();
-    } catch (error) {
-      // Try to extract date using regex pattern
+    } catch {
       const dMatch = block.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
       if (dMatch) {
         const y = Number(dMatch[1]);
@@ -411,12 +327,10 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
         const d = Number(dMatch[3]);
         try {
           publishedAt = new Date(Date.UTC(y, m - 1, d)).toISOString();
-        } catch (regexDateError) {
-          // If even the regex extracted date fails, use current date
+        } catch {
           publishedAt = new Date().toISOString();
         }
       } else {
-        // Fallback to current date if no valid date found
         publishedAt = new Date().toISOString();
       }
     }
@@ -431,7 +345,7 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
       urlToImage: undefined,
       publishedAt,
       source: { name: sourceName || guessSourceName(url) },
-      category: category as any,
+      category: normalizeCategoryKey(category),
     };
 
     if (!isLocalOutlet(item.source.name, item.url)) continue;
@@ -449,11 +363,16 @@ async function searchWithGemini(
   to?: string | null
 ): Promise<NewsArticle[]> {
   const apiKey = process.env.GEMINI_API_KEY;
-  const configuredUrl = process.env.GEMINI_API_URL; // optional: full path to :generateContent
+  const configuredUrl = process.env.GEMINI_API_URL; // optional full :generateContent path
   if (!apiKey) throw new Error('Gemini API key missing');
 
   const url = `${configuredUrl || getGeminiEndpoint()}?key=${apiKey}`;
-  const prompt = getGeminiSearchPrompt(category, query || undefined, from || undefined, to || undefined);
+  const prompt = getGeminiSearchPrompt(
+    category,
+    query || undefined,
+    from || undefined,
+    to || undefined
+  );
   const requestBody = { contents: [{ parts: [{ text: prompt }] }] };
 
   const response = await fetch(url, {
@@ -467,19 +386,16 @@ async function searchWithGemini(
     throw new Error(`Gemini API responded with ${response.status}${errText ? `: ${errText}` : ''}`);
   }
 
-  const data = await response.json().catch(() => ({} as any));
+  const data = (await response.json().catch(() => ({}))) as any;
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   let items = parseGeminiResponse(text, category);
 
   // Respect date window
   items = items.filter((a) => withinWindow(a.publishedAt, from, to));
 
+  // If nothing returned, throw to trigger web/NewsAPI fallback
   if (items.length === 0) {
-    // Curated mock fallback, window-filtered
-    const fallback = mockNews
-      .filter((a) => category === 'all' || a.category === category)
-      .filter((a) => withinWindow(a.publishedAt, from, to));
-    return fallback;
+    throw new Error('Gemini returned no items');
   }
 
   return items.slice(0, 15);
@@ -487,7 +403,7 @@ async function searchWithGemini(
 
 // WEB SEARCH PROVIDERS
 
-// 1) Tavily (recommended: supports include_domains)
+// 1) Tavily
 async function webSearchTavily(
   category: string,
   userQuery?: string | null,
@@ -498,7 +414,7 @@ async function webSearchTavily(
   const key = process.env.TAVILY_API_KEY;
   if (!key) throw new Error('Tavily API not configured');
 
-  // Valid values only: 'day' | 'week' | 'month' | 'year'
+  // Valid values: 'day' | 'week' | 'month' | 'year'
   let time_range: 'day' | 'week' | 'month' | 'year' | undefined = undefined;
   if (from || to) {
     const start = from ? new Date(from).getTime() : Date.now() - 365 * 24 * 60 * 60 * 1000;
@@ -506,12 +422,12 @@ async function webSearchTavily(
     const spanDays = Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)));
     if (spanDays <= 7) time_range = 'week';
     else if (spanDays <= 31) time_range = 'month';
-    else time_range = 'year'; // use 'year' for anything longer; avoid 'all' (unsupported)
+    else time_range = 'year';
   }
 
   const query = buildCategoryQuery(category, userQuery);
 
-  const payload: Record<string, unknown> = { // FIXED: changed from 'any' to proper type
+  const payload: Record<string, unknown> = {
     api_key: key,
     query,
     search_depth: 'advanced',
@@ -536,33 +452,36 @@ async function webSearchTavily(
     throw new Error(`Tavily responded with ${res.status}${errText ? `: ${errText}` : ''}`);
   }
 
-    const data = await res.json() as { results?: Array<Record<string, unknown>> }; // FIXED: proper typing
+  const data = (await res.json()) as { results?: Array<Record<string, unknown>> };
 
-    const items: NewsArticle[] = (data.results || [])
-        .map((r: Record<string, unknown>, i: number) => { // FIXED: proper typing
-        const publishedAt = (r.published_date as string) ? new Date(r.published_date as string).toISOString() : new Date().toISOString();
+  const mapped: NewsArticle[] = (data.results || []).map(
+    (r: Record<string, unknown>, i: number): NewsArticle => {
+        const publishedAt = (r.published_date as string)
+        ? new Date(r.published_date as string).toISOString()
+        : new Date().toISOString();
         const sourceName = guessSourceName(r.url as string, r.source as string);
         return {
-            id: `tavily_${Date.now()}_${i}`,
-            title: r.title as string,
-            description: (r.content as string) || (r.snippet as string) || 'No description.',
-            url: r.url as string,
-            urlToImage: undefined,
-            publishedAt,
-            source: { name: sourceName },
-            category: category as NewsArticle['category'],
-            content: (r.snippet as string) || (r.content as string),
+        id: `tavily_${Date.now()}_${i}`,
+        title: r.title as string,
+        description: (r.content as string) || (r.snippet as string) || 'No description.',
+        url: r.url as string,
+        urlToImage: undefined,
+        publishedAt,
+        source: { name: sourceName },
+        category: normalizeCategoryKey(category),
+        content: (r.snippet as string) || (r.content as string),
         };
-        })
-        .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
-        .filter((a: NewsArticle) => withinWindow(a.publishedAt, from, to));
+    }
+    );
+
+    const items = mapped
+    .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
+    .filter((a: NewsArticle) => withinWindow(a.publishedAt, from, to));
 
     return dedupeArticles(items).slice(0, pageSize);
-    }
-// 2) Brave Search (good published timestamp in many results)
+}
 
-
-// 3) Serper.dev (Google) news results
+// 2) Serper.dev (Google News)
 async function webSearchSerper(
   category: string,
   userQuery?: string | null,
@@ -573,12 +492,10 @@ async function webSearchSerper(
   const key = process.env.SERPER_API_KEY;
   if (!key) throw new Error('Serper API not configured');
 
-  // You can use /news endpoint for news-specific results
   const endpoint = 'https://google.serper.dev/news';
   const siteFilter = PH_DOMAINS.map((d) => `site:${d}`).join(' OR ');
   const q = `${buildCategoryQuery(category, userQuery)} ${siteFilter}`;
 
-  // Serper supports gl (location) and hl (language). tbs for custom date ranges is not guaranteed; we filter afterward.
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -594,31 +511,38 @@ async function webSearchSerper(
     }),
   });
 
-  if (!res.ok) throw new Error(`Serper responded with ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Serper responded with ${res.status}${errText ? `: ${errText}` : ''}`);
+  }
   const data = await res.json();
 
-   const items: NewsArticle[] = (data?.news || [])
-    .map((r: Record<string, unknown>, i: number) => { // FIXED: proper typing
-      const publishedAt = (r.date as string) ? new Date(r.date as string).toISOString() : new Date().toISOString();
-      // FIXED: removed unused 'host' variable
-      const sourceName = guessSourceName(r.link as string, r.source as string);
+  const mapped: NewsArticle[] = (data?.news || []).map(
+    (r: Record<string, unknown>, i: number): NewsArticle => {
+        const publishedAt = (r.date as string)
+        ? new Date(r.date as string).toISOString()
+        : new Date().toISOString();
+        const sourceName = guessSourceName(r.link as string, r.source as string);
 
-      return {
+        return {
         id: `serper_${Date.now()}_${i}`,
         title: r.title as string,
         description: (r.snippet as string) || 'No description.',
         url: r.link as string,
-        urlToImage: r.imageUrl as string,
+        urlToImage: (r as any).imageUrl as string,
         publishedAt,
         source: { name: sourceName },
-        category: category as NewsArticle['category'],
+        category: normalizeCategoryKey(category),
         content: r.snippet as string,
-      };
-    })
+        };
+    }
+    );
+
+    const items = mapped
     .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
     .filter((a: NewsArticle) => withinWindow(a.publishedAt, from, to));
 
-  return dedupeArticles(items).slice(0, pageSize);
+    return dedupeArticles(items).slice(0, pageSize);
 }
 
 // Orchestrator: try web providers in order
@@ -634,7 +558,6 @@ async function searchWithWeb(
   const tryOrder: Array<() => Promise<NewsArticle[]>> = [];
 
   const hasTavily = !!process.env.TAVILY_API_KEY;
-  
   const hasSerper = !!process.env.SERPER_API_KEY;
 
   const pushByName = (name: string) => {
@@ -649,13 +572,12 @@ async function searchWithWeb(
   if (preferred) pushByName(preferred);
 
   if (tryOrder.length === 0) {
-    // Auto-detect
     if (hasTavily) tryOrder.push(() => webSearchTavily(category, query, from, to, pageSize));
     if (hasSerper) tryOrder.push(() => webSearchSerper(category, query, from, to, pageSize));
   }
 
   let collected: NewsArticle[] = [];
-  let firstError: any = null;
+  let firstError: unknown = null;
 
   for (const fn of tryOrder) {
     try {
@@ -739,28 +661,34 @@ async function fallbackNewsAPISearch(
     data = await fetchNewsApiBatch(withoutDomains);
   }
 
-    let items: NewsArticle[] = (data.articles || [])
-        .filter((article: Record<string, unknown>) => { // FIXED: proper typing
-        const url = (article.url as string) || '';
-        const host = getHostname(url);
-        if (EXCLUDE_DOMAINS.includes(host)) return false;
-        return isLocalOutlet((article.source as Record<string, unknown>)?.name as string, url);
-        })
-        .filter((article: Record<string, unknown>) => withinWindow(article.publishedAt as string, from, to)) // FIXED: proper typing
-        .map((article: Record<string, unknown>, index: number) => ({ // FIXED: proper typing
-        id: `newsapi_${Date.now()}_${index}`,
-        title: article.title as string,
-        description: article.description as string,
-        url: article.url as string,
-        urlToImage: article.urlToImage as string,
-        publishedAt: article.publishedAt as string,
-        source: { name: ((article.source as Record<string, unknown>)?.name as string) || guessSourceName(article.url as string) },
-        category: category as NewsArticle['category'],
-        content: article.content as string,
-        }));
+  let items: NewsArticle[] = (data.articles || [])
+    .filter((article: Record<string, unknown>) => {
+      const url = (article.url as string) || '';
+      const host = getHostname(url);
+      if (EXCLUDE_DOMAINS.includes(host)) return false;
+      return isLocalOutlet((article.source as Record<string, unknown>)?.name as string, url);
+    })
+    .filter((article: Record<string, unknown>) =>
+      withinWindow(article.publishedAt as string, from, to)
+    )
+    .map((article: Record<string, unknown>, index: number) => ({
+      id: `newsapi_${Date.now()}_${index}`,
+      title: article.title as string,
+      description: article.description as string,
+      url: article.url as string,
+      urlToImage: article.urlToImage as string,
+      publishedAt: article.publishedAt as string,
+      source: {
+        name:
+          ((article.source as Record<string, unknown>)?.name as string) ||
+          guessSourceName(article.url as string),
+      },
+      category: normalizeCategoryKey(category),
+      content: article.content as string,
+    }));
 
-    items = dedupeArticles(items);
-    return items.slice(0, pageSize);
+  items = dedupeArticles(items);
+  return items.slice(0, pageSize);
 }
 
 export async function GET(request: NextRequest) {
@@ -786,21 +714,6 @@ export async function GET(request: NextRequest) {
     });
 
     const useGeminiSearch = process.env.USE_GEMINI_SEARCH === 'true';
-    const useMockData = process.env.USE_MOCK_DATA === 'true';
-
-    if (useMockData) {
-      const filteredArticles = (category === 'all'
-        ? mockNews
-        : mockNews.filter((a) => a.category === category)
-      ).filter((a) => withinWindow(a.publishedAt, from, to));
-
-      return NextResponse.json({
-        status: 'ok',
-        totalResults: filteredArticles.length,
-        articles: filteredArticles,
-        fallback: true,
-      });
-    }
 
     let articles: NewsArticle[] = [];
 
@@ -850,25 +763,18 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error in corruption news API:', error);
 
-    const url = new URL(request.url);
-    const category = (url.searchParams.get('category') || 'all') as
-      | 'all'
-      | NewsArticle['category'];
-    const from = url.searchParams.get('from');
-    const to = url.searchParams.get('to');
-
-    const filteredArticles = (category === 'all'
-      ? mockNews
-      : mockNews.filter((a) => a.category === category)
-    ).filter((a) => withinWindow(a.publishedAt, from, to));
-
-    return NextResponse.json({
-      status: 'ok',
-      totalResults: filteredArticles.length,
-      articles: filteredArticles,
-      fallback: true,
-      error: 'Service unavailable - using curated corruption news data',
-    });
+    // Return error (no mock fallback)
+    return NextResponse.json(
+      {
+        status: 'error',
+        totalResults: 0,
+        articles: [],
+        error:
+          (error as Error)?.message ||
+          'Service unavailable - upstream providers failed',
+      },
+      { status: 502 }
+    );
   }
 }
 
