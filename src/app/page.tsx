@@ -18,15 +18,29 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  FileText,      // For TLDR button
-  Zap,          // For TLDR icon
+  FileText,
+  Zap,
   ExternalLink,
   Check,
-  Copy  // For read more button
+  Copy,
+  // NEW: icons for About modal
+  Mail,
+  Globe,
+  Github,
+  Twitter,
+  Facebook,
 } from 'lucide-react';
-// FIXED: Removed unused imports: Heart, MessageCircle, Bookmark
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=600&fit=crop&q=80';
+
+// NEW: Contact configuration (override with NEXT_PUBLIC_* envs)
+const CONTACT = {
+  brand: process.env.NEXT_PUBLIC_BRAND_NAME || 'Beware',
+  email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'virgildelacruz15@gmail.com',
+  website: process.env.NEXT_PUBLIC_SITE_URL || '',
+  twitter: process.env.NEXT_PUBLIC_TWITTER_URL || '',
+  github: process.env.NEXT_PUBLIC_GITHUB_URL || '',
+};
 
 type Article = {
   id: number | string;
@@ -84,20 +98,21 @@ const CheeseMiss = () => {
   const [readProgress, setReadProgress] = useState(0);
   const [isFallbackMode, setIsFallbackMode] = useState(false);
 
+  // NEW: About modal state
+  const [aboutOpen, setAboutOpen] = useState(false);
+
   // Day scroller window state
   const WINDOW_SIZE = 14; // days visible per window
-  const [windowOffset, setWindowOffset] = useState(0); // 0 = includes today; grows older by WINDOW_SIZE steps
+  const [windowOffset, setWindowOffset] = useState(0);
 
-  // Categories using lucide icons (removed favorites)
   const categories: { key: CategoryKey; label: string; icon: LucideIcon }[] = [
     { key: 'all', label: 'All News', icon: Newspaper },
     { key: 'flood-control', label: 'Flood Control', icon: Waves },
     { key: 'dpwh', label: 'DPWH', icon: Hammer },
     { key: 'corrupt-politicians', label: 'Corrupt Politicians', icon: Scale },
-    { key: 'nepo-babies', label: 'Nepo Babies', icon: Crown }
+    { key: 'nepo-babies', label: 'Nepo Babies', icon: Crown },
   ];
 
-  // API function to fetch news (now supports optional from/to params for day filtering)
   const fetchNews = useCallback(
     async (opts: {
       category?: string;
@@ -116,7 +131,6 @@ const CheeseMiss = () => {
       if (from) params.append('from', from);
       if (to) params.append('to', to);
 
-      // These are harmless if your backend ignores them
       params.append('country', 'ph');
       params.append('language', 'en');
       params.append('pageSize', '20');
@@ -125,7 +139,7 @@ const CheeseMiss = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `HTTP ${response.status}`;
+        const errorMessage = (errorData as any).error || `HTTP ${response.status}`;
         const isRetryable = response.status >= 500 || response.status === 429;
 
         throw new Error(
@@ -142,7 +156,6 @@ const CheeseMiss = () => {
     []
   );
 
-  // Load news (stable function, params in call sites)
   const loadNews = useCallback(
     async (opts: {
       category?: string;
@@ -169,8 +182,8 @@ const CheeseMiss = () => {
         try {
           const errorInfo = JSON.parse((err as Error).message);
           setError({
-            message: errorInfo.message || 'Failed to load news',
-            isRetryable: errorInfo.isRetryable || false,
+            message: (errorInfo as any).message || 'Failed to load news',
+            isRetryable: (errorInfo as any).isRetryable || false,
           });
         } catch {
           setError({
@@ -186,9 +199,7 @@ const CheeseMiss = () => {
     [fetchNews]
   );
 
-  // Load news on mount and when filters change (debounced for search)
   useEffect(() => {
-    // FIXED: removed unused 'today' variable
     const day = selectedDay ? startOfDay(new Date(selectedDay)) : null;
     const from = day ? startOfDay(day).toISOString() : undefined;
     const to = day ? endOfDay(day).toISOString() : undefined;
@@ -206,7 +217,6 @@ const CheeseMiss = () => {
     return () => clearTimeout(t);
   }, [selectedCategory, selectedDay, searchQuery, loadNews]);
 
-  // UI listeners for scroll
   useEffect(() => {
     const onScroll = () => {
       setShowScrollTop(window.scrollY > 300);
@@ -222,7 +232,6 @@ const CheeseMiss = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, [selectedArticle]);
 
-  // Filter articles (client-side) for day filtering (simplified without favorites)
   const filteredArticles = useMemo(() => {
     let filtered = articles;
 
@@ -234,9 +243,8 @@ const CheeseMiss = () => {
     }
 
     return filtered;
-  }, [articles, selectedDay]); // FIXED: removed selectedCategory from dependencies
+  }, [articles, selectedDay]);
 
-  // Utilities
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -271,7 +279,6 @@ const CheeseMiss = () => {
     }
   };
 
-  // Category icon and color (for article metadata)
   const getCategoryIcon = (category: string, size = 'w-3 h-3') => {
     switch (category) {
       case 'flood-control':
@@ -302,11 +309,9 @@ const CheeseMiss = () => {
     }
   };
 
-  // Day scroller component (Prev/Next + Today + date input)
   const DayScroller = () => {
     const today = startOfDay(new Date());
 
-    // Build window [older ... newer], newest day is today - windowOffset
     const days = Array.from({ length: WINDOW_SIZE }, (_, i) => {
       const dayIndexFromToday = windowOffset + (WINDOW_SIZE - 1 - i);
       const date = new Date(today.getTime() - dayIndexFromToday * msPerDay);
@@ -316,7 +321,6 @@ const CheeseMiss = () => {
     const isFuture = (d: Date) => d.getTime() > today.getTime();
     const articlesDaySet = new Set(articles.map((a) => new Date(a.publishedAt).toDateString()));
 
-    // Helper function to get abbreviated day name (2 letters)
     const getDayAbbreviation = (date: Date): string => {
       const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
       return dayNames[date.getDay()];
@@ -325,7 +329,6 @@ const CheeseMiss = () => {
     const jumpToDate = (d: Date) => {
       const chosen = startOfDay(d);
       const diffDays = Math.max(0, Math.floor((today.getTime() - chosen.getTime()) / msPerDay));
-      // Center chosen day within the window when possible
       const centeredOffset = Math.max(0, diffDays - Math.floor(WINDOW_SIZE / 2));
       setWindowOffset(centeredOffset);
       setSelectedDay(chosen.toDateString());
@@ -405,25 +408,16 @@ const CheeseMiss = () => {
                 title={toLabel(d)}
               >
                 <div className="w-full h-full flex flex-col items-center justify-center leading-none">
-                  {/* Day abbreviation (2 letters) */}
-                  <span 
+                  <span
                     className={`text-[10px] font-medium mb-0.5 ${
-                      isSelected 
-                        ? 'text-white/80' 
-                        : disabled 
-                        ? 'text-gray-400' 
-                        : 'text-gray-500'
+                      isSelected ? 'text-white/80' : disabled ? 'text-gray-400' : 'text-gray-500'
                     }`}
                   >
                     {getDayAbbreviation(d)}
                   </span>
-                  
-                  {/* Date number */}
                   <span className={`text-base font-semibold ${isToday ? 'font-bold' : ''}`}>
                     {d.getDate()}
                   </span>
-                  
-                  {/* News indicator dot */}
                   <span
                     className={`mt-0.5 w-1 h-1 rounded-full ${
                       isSelected ? 'bg-white/90' : hasNews ? 'bg-red-400' : 'bg-transparent'
@@ -438,10 +432,8 @@ const CheeseMiss = () => {
     );
   };
 
-  // Top bar component
   const TopBar = () => {
-    const selectedLabel =
-      selectedDay ? toLabel(new Date(selectedDay)) : 'All recent days';
+    const selectedLabel = selectedDay ? toLabel(new Date(selectedDay)) : 'All recent days';
 
     return (
       <div className="bg-white/90 backdrop-blur border-b border-gray-200">
@@ -449,7 +441,7 @@ const CheeseMiss = () => {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-900 tracking-tight">
-                Beware
+                {CONTACT.brand}
               </span>
               {isFallbackMode && (
                 <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
@@ -485,7 +477,6 @@ const CheeseMiss = () => {
     );
   };
 
-  // Error display component
   const ErrorDisplay = () => {
     if (!error) return null;
 
@@ -522,6 +513,125 @@ const CheeseMiss = () => {
     );
   };
 
+  // NEW: About modal component
+  const AboutModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
+    const [copiedEmail, setCopiedEmail] = useState(false);
+
+    useEffect(() => {
+      if (!open) return;
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+      };
+      document.addEventListener('keydown', onKey);
+      // Lock scroll while modal is open
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.removeEventListener('keydown', onKey);
+        document.body.style.overflow = prev;
+      };
+    }, [open, onClose]);
+
+    if (!open) return null;
+
+    const handleCopyEmail = async () => {
+      if (!CONTACT.email) return;
+      try {
+        await navigator.clipboard.writeText(CONTACT.email);
+        setCopiedEmail(true);
+        setTimeout(() => setCopiedEmail(false), 900);
+      } catch {}
+    };
+
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="about-title"
+        onClick={onClose}
+      >
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+        <div
+          className="relative w-full max-w-md mx-4 rounded-xl bg-white shadow-xl border border-gray-200 p-5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            aria-label="Close"
+            onClick={onClose}
+            className="absolute top-3 right-3 p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <h3 id="about-title" className="text-lg font-semibold text-gray-900">
+            About {CONTACT.brand}
+          </h3>
+          <p className="mt-1 text-sm text-gray-600">
+            This is an independent project that helps surface Filipino corruption-related news from local outlets. All news articles and images remain the property of their respective creators, and full credit goes to the original publishers.
+          </p>
+
+          <div className="mt-4 space-y-2 text-sm">
+            {CONTACT.email && (
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-gray-500" />
+                <a href={`mailto:${CONTACT.email}`} className="text-gray-800 hover:underline">
+                  virgildelacruz15@gmail.com
+                </a>        
+              </div>
+            )}
+
+            {CONTACT.website && (
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-gray-500" />
+                <a
+                  href={CONTACT.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-800 hover:underline break-all"
+                >
+                  {CONTACT.website}
+                </a>
+              </div>
+            )}
+
+            {CONTACT.twitter && (
+              <div className="flex items-center gap-2">
+                <Twitter className="w-4 h-4 text-gray-500" />
+                <a
+                  href={CONTACT.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-800 hover:underline break-all"
+                >
+                  {CONTACT.twitter}
+                </a>
+              </div>
+            )}
+
+            {CONTACT.github && (
+              <div className="flex items-center gap-2">
+                <Github className="w-4 h-4 text-gray-500" />
+                <a
+                  href={CONTACT.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-800 hover:underline break-all"
+                >
+                  {CONTACT.github}
+                </a>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 text-[11px] text-gray-500">
+            Sources are credited and link to the original articles. For takedown or corrections, please contact us.
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Article card component
   const ArticleCard = ({ article, index }: { article: Article; index: number }) => {
     const [showTldr, setShowTldr] = useState(false);
@@ -529,8 +639,6 @@ const CheeseMiss = () => {
     const [loadingTldr, setLoadingTldr] = useState(false);
     const [tldrError, setTldrError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
-
-    // FIXED: removed unused tldrId variable
 
     const generateTldr = async () => {
       if (tldr || loadingTldr) return;
@@ -574,13 +682,10 @@ const CheeseMiss = () => {
       } catch {}
     };
 
-    // Handle article click - redirect to external URL or show in detail view if no URL
     const handleArticleClick = () => {
       if (article.url) {
-        // Open the article URL in a new tab
         window.open(article.url, '_blank', 'noopener,noreferrer');
       } else {
-        // Fallback: show detail view if no URL available
         setSelectedArticle(article);
       }
     };
@@ -611,8 +716,7 @@ const CheeseMiss = () => {
               img.src = FALLBACK_IMAGE;
             }}
           />
-                    
-          {/* External link indicator */}
+
           {article.url && (
             <div className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-black/50 text-white grid place-items-center backdrop-blur-sm">
               <ExternalLink className="w-4 h-4" />
@@ -621,7 +725,6 @@ const CheeseMiss = () => {
         </div>
 
         <div className="p-4">
-          {/* Meta */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
@@ -638,12 +741,9 @@ const CheeseMiss = () => {
             <div className="text-xs text-gray-400">#{index + 1}</div>
           </div>
 
-          {/* TL;DR collapsible */}
           <div
             className={`transition-[max-height,opacity] duration-300 ease-out ${
-              showTldr
-                ? 'max-h-[400px] opacity-100 mb-3'
-                : 'max-h-0 opacity-0 overflow-hidden'
+              showTldr ? 'max-h-[400px] opacity-100 mb-3' : 'max-h-0 opacity-0 overflow-hidden'
             }`}
           >
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
@@ -654,9 +754,7 @@ const CheeseMiss = () => {
                   <button
                     onClick={handleCopy}
                     className={`ml-auto p-1 rounded transition-colors ${
-                      copied
-                        ? 'bg-green-100 text-green-600'
-                        : 'hover:bg-yellow-100 text-yellow-600'
+                      copied ? 'bg-green-100 text-green-600' : 'hover:bg-yellow-100 text-yellow-600'
                     }`}
                     title={copied ? 'Copied!' : 'Copy summary'}
                   >
@@ -681,17 +779,14 @@ const CheeseMiss = () => {
             </div>
           </div>
 
-          {/* Title */}
           <h2 className="font-bold text-gray-900 mb-2 line-clamp-3 group-hover:text-red-700 transition-colors">
             {article.title}
           </h2>
 
-          {/* Description */}
           <p className="text-gray-600 text-sm mb-3 line-clamp-2 leading-relaxed">
             {article.description}
           </p>
 
-          {/* Actions */}
           <div className="flex items-center gap-2 pt-2">
             <div className="flex items-center text-xs text-gray-500">
               <span>
@@ -699,7 +794,7 @@ const CheeseMiss = () => {
                 {article.url ? 'Click to read full article' : 'View details'}
               </span>
             </div>
-            
+
             <div className="ml-auto flex items-center gap-1">
               <button
                 onClick={(e) => handleShare(e, article)}
@@ -711,9 +806,7 @@ const CheeseMiss = () => {
               <button
                 onClick={handleToggleTldr}
                 className={`p-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                  showTldr
-                    ? 'bg-red-100 text-red-700'
-                    : 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-700'
+                  showTldr ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-700'
                 }`}
                 title="Toggle TL;DR"
               >
@@ -731,7 +824,6 @@ const CheeseMiss = () => {
   if (selectedArticle) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Progress bar */}
         <div
           className="fixed top-0 left-0 h-1 bg-red-500 z-50 transition-all duration-150"
           style={{ width: `${readProgress}%` }}
@@ -804,7 +896,21 @@ const CheeseMiss = () => {
               </div>
             </div>
           </article>
+
+          {/* NEW: About link + modal in detail view bottom */}
+          <div className="mt-10 text-center text-xs text-gray-500">
+            <button
+              onClick={() => setAboutOpen(true)}
+              className="underline hover:text-gray-700"
+              aria-haspopup="dialog"
+            >
+              About
+            </button>
+          </div>
         </div>
+
+        {/* NEW: Modal mount */}
+        <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
       </div>
     );
   }
@@ -814,13 +920,10 @@ const CheeseMiss = () => {
     <div className="min-h-screen bg-gray-50">
       <TopBar />
 
-      {/* Filters */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 py-3 space-y-4">
-          {/* Day scroller (infinite back) */}
           <DayScroller />
 
-          {/* Categories */}
           <div className="flex flex-wrap items-center gap-2">
             {categories.map((c) => {
               const active = selectedCategory === c.key;
@@ -831,10 +934,7 @@ const CheeseMiss = () => {
                   onClick={() => setSelectedCategory(c.key)}
                   aria-pressed={active}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 flex items-center gap-2 flex-shrink-0
-                    ${active
-                      ? 'bg-red-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    ${active ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
                 >
                   <Icon className="w-4 h-4" />
                   {c.label}
@@ -843,21 +943,17 @@ const CheeseMiss = () => {
             })}
           </div>
 
-          {/* Quick stats */}
           <div className="flex items-center justify-between text-sm text-gray-500">
             <span>
               {loading ? 'Loading…' : error ? 'May error sa pagkuha ng balita' : `${filteredArticles.length} articles`}
             </span>
             {isFallbackMode && (
-              <span className="text-orange-600 text-xs">
-                🔄 Demo data (API key needed for live news)
-              </span>
+              <span className="text-orange-600 text-xs">🔄 Demo data (API key needed for live news)</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Feed */}
       <div className="max-w-3xl mx-auto px-4 py-4">
         {loading ? (
           <div className="space-y-3">
@@ -881,7 +977,7 @@ const CheeseMiss = () => {
             </div>
             <div className="font-semibold text-gray-900">Walang nahanap na balita</div>
             <div className="text-sm text-gray-500 mt-1">
-              Subukan ang ibang araw, category o search terms.
+              What if itry mo ang ibang araw o category.
             </div>
             <div className="flex justify-center gap-2 mt-4">
               <button
@@ -911,6 +1007,17 @@ const CheeseMiss = () => {
         )}
       </div>
 
+      {/* NEW: About link at bottom */}
+      <div className="max-w-3xl mx-auto px-4 pb-12 text-center text-xs text-gray-500">
+        <button
+          onClick={() => setAboutOpen(true)}
+          className="underline hover:text-gray-700"
+          aria-haspopup="dialog"
+        >
+          About
+        </button>
+      </div>
+
       {/* Scroll-to-top */}
       {showScrollTop && (
         <button
@@ -921,6 +1028,9 @@ const CheeseMiss = () => {
           <ArrowUp className="w-5 h-5" />
         </button>
       )}
+
+      {/* NEW: Modal mount */}
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
 };
