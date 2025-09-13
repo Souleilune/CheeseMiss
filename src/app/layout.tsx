@@ -12,7 +12,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "CheeseMiss - Filipino Corruption News",
+  title: "Beware - Be Aware to Social Issues",
   description: "Latest news on corruption cases in the Philippines - DPWH, flood control, politicians, and nepotism",
 };
 
