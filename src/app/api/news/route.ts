@@ -296,7 +296,7 @@ function buildCategoryQuery(category: string, userQuery?: string | null) {
   return userQuery ? `${q} ${userQuery}` : q;
 }
 
-// Gemini prompt
+// Gemini prompt (includes the names in nepo-babies block)
 function getGeminiSearchPrompt(
   category: string,
   query?: string,
@@ -794,8 +794,10 @@ async function fallbackNewsAPISearch(
       if (EXCLUDE_DOMAINS.includes(host as (typeof EXCLUDE_DOMAINS)[number])) return false;
       return isLocalOutlet((article.source as Record<string, unknown>)?.name as string, url);
     })
-    .filter((article) => withinWindow(article.publishedAt as string, from, to))
-    .map((article, index): NewsArticle => ({
+    .filter((article) =>
+      withinWindow(article.publishedAt as string, from, to)
+    )
+    .map((article): NewsArticle => ({
       id: stableId('newsapi', article.url as string, article.title as string),
       title: (article.title as string) || '',
       description: (article.description as string) || '',
@@ -803,7 +805,9 @@ async function fallbackNewsAPISearch(
       urlToImage: (article.urlToImage as string) || undefined,
       publishedAt: (article.publishedAt as string) || new Date().toISOString(),
       source: {
-        name: ((article.source as Record<string, unknown>)?.name as string) || guessSourceName(article.url as string),
+        name:
+          ((article.source as Record<string, unknown>)?.name as string) ||
+          guessSourceName(article.url as string),
       },
       category: normalizeCategoryKey(category),
       content: (article.content as string) || '',
