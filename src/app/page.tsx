@@ -27,8 +27,7 @@ import {
   Copy  // For read more button
 } from 'lucide-react';
 
-const FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&h=800&fit=crop';
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&h=800&fit=crop&q=80';
 
 type Article = {
   id: number | string;
@@ -55,7 +54,7 @@ interface ErrorState {
   isRetryable: boolean;
 }
 
-type CategoryKey = 'all' | 'favorites' | Article['category'];
+type CategoryKey = 'all' | Article['category'];
 
 // Date helpers
 const msPerDay = 24 * 60 * 60 * 1000;
@@ -80,7 +79,6 @@ const CheeseMiss = () => {
   // Selected day stored as toDateString to avoid time drift issues
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  const [favorites, setFavorites] = useState<(number | string)[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
 
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -97,8 +95,7 @@ const CheeseMiss = () => {
     { key: 'flood-control', label: 'Flood Control', icon: Waves },
     { key: 'dpwh', label: 'DPWH', icon: Hammer },
     { key: 'corrupt-politicians', label: 'Corrupt Politicians', icon: Scale },
-    { key: 'nepo-babies', label: 'Nepo Babies', icon: Crown },
-    { key: 'favorites', label: 'Favorites', icon: Heart },
+    { key: 'nepo-babies', label: 'Nepo Babies', icon: Crown }
   ];
 
   // API function to fetch news (now supports optional from/to params for day filtering)
@@ -113,7 +110,7 @@ const CheeseMiss = () => {
       const { category, query, from, to } = opts || {};
       const params = new URLSearchParams();
 
-      if (category && category !== 'all' && category !== 'favorites') {
+      if (category && category !== 'all') {
         params.append('category', category);
       }
       if (query) params.append('q', query);
@@ -192,13 +189,6 @@ const CheeseMiss = () => {
 
   // Load news on mount and when filters change (debounced for search)
   useEffect(() => {
-    if (selectedCategory === 'favorites') {
-      // No network fetch needed for local favorites view
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
     const today = startOfDay(new Date());
     const day = selectedDay ? startOfDay(new Date(selectedDay)) : null;
     const from = day ? startOfDay(day).toISOString() : undefined;
@@ -216,19 +206,7 @@ const CheeseMiss = () => {
 
     return () => clearTimeout(t);
   }, [selectedCategory, selectedDay, searchQuery, loadNews]);
-
-  // Favorites persistence
-  useEffect(() => {
-    const raw = localStorage.getItem('news:favorites');
-    if (raw) {
-      try {
-        setFavorites(JSON.parse(raw));
-      } catch {}
-    }
-  }, []);
-  useEffect(() => {
-    localStorage.setItem('news:favorites', JSON.stringify(favorites));
-  }, [favorites]);
+  
 
   // UI listeners for scroll
   useEffect(() => {
@@ -250,10 +228,6 @@ const CheeseMiss = () => {
   const filteredArticles = useMemo(() => {
     let filtered = articles;
 
-    if (selectedCategory === 'favorites') {
-      filtered = filtered.filter((a) => favorites.includes(a.id));
-    }
-
     if (selectedDay) {
       filtered = filtered.filter((a) => {
         const articleDate = new Date(a.publishedAt).toDateString();
@@ -262,13 +236,9 @@ const CheeseMiss = () => {
     }
 
     return filtered;
-  }, [articles, selectedCategory, selectedDay, favorites]);
+  }, [articles, selectedCategory, selectedDay,]);
 
   // Utilities
-  const toggleFavorite = (id: number | string) => {
-    setFavorites((prev) => (prev.includes(id) ? prev.filter((fav) => fav !== id) : [...prev, id]));
-  };
-
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -348,6 +318,12 @@ const CheeseMiss = () => {
     const isFuture = (d: Date) => d.getTime() > today.getTime();
     const articlesDaySet = new Set(articles.map((a) => new Date(a.publishedAt).toDateString()));
 
+    // Helper function to get abbreviated day name (2 letters)
+    const getDayAbbreviation = (date: Date): string => {
+      const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+      return dayNames[date.getDay()];
+    };
+
     const jumpToDate = (d: Date) => {
       const chosen = startOfDay(d);
       const diffDays = Math.max(0, Math.floor((today.getTime() - chosen.getTime()) / msPerDay));
@@ -412,13 +388,14 @@ const CheeseMiss = () => {
             const isSelected = selectedDay === key;
             const hasNews = articlesDaySet.has(key);
             const disabled = isFuture(d);
+            const isToday = d.toDateString() === today.toDateString();
 
             return (
               <button
                 key={key}
                 onClick={() => setSelectedDay(isSelected ? null : key)}
                 disabled={disabled}
-                className={`min-w-[44px] h-11 rounded-lg text-sm font-medium transition-colors
+                className={`min-w-[48px] h-14 rounded-lg text-sm font-medium transition-colors
                   ${
                     isSelected
                       ? 'bg-red-500 text-white'
@@ -429,15 +406,31 @@ const CheeseMiss = () => {
                   focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400`}
                 title={toLabel(d)}
               >
-                <div className="w-full h-full grid place-items-center">
-                  <div className="flex flex-col items-center leading-none">
-                    <span>{d.getDate()}</span>
-                    <span
-                      className={`mt-1 w-1 h-1 rounded-full ${
-                        isSelected ? 'bg-white/90' : hasNews ? 'bg-red-400' : 'bg-transparent'
-                      }`}
-                    />
-                  </div>
+                <div className="w-full h-full flex flex-col items-center justify-center leading-none">
+                  {/* Day abbreviation (2 letters) */}
+                  <span 
+                    className={`text-[10px] font-medium mb-0.5 ${
+                      isSelected 
+                        ? 'text-white/80' 
+                        : disabled 
+                        ? 'text-gray-400' 
+                        : 'text-gray-500'
+                    }`}
+                  >
+                    {getDayAbbreviation(d)}
+                  </span>
+                  
+                  {/* Date number */}
+                  <span className={`text-base font-semibold ${isToday ? 'font-bold' : ''}`}>
+                    {d.getDate()}
+                  </span>
+                  
+                  {/* News indicator dot */}
+                  <span
+                    className={`mt-0.5 w-1 h-1 rounded-full ${
+                      isSelected ? 'bg-white/90' : hasNews ? 'bg-red-400' : 'bg-transparent'
+                    }`}
+                  />
                 </div>
               </button>
             );
@@ -458,7 +451,7 @@ const CheeseMiss = () => {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-900 tracking-tight">
-                Cheese Miss
+                Beware
               </span>
               {isFallbackMode && (
                 <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
@@ -487,8 +480,8 @@ const CheeseMiss = () => {
             </div>
             <div className="hidden sm:flex items-center gap-3 text-sm text-gray-500">
               <div className="px-2 py-1 rounded bg-gray-100 text-gray-700">{selectedLabel}</div>
-              <Bookmark className="w-4 h-4 text-red-500" />
-              <span>{favorites.length}</span>
+              
+              
             </div>
           </div>
         </div>
@@ -535,7 +528,6 @@ const CheeseMiss = () => {
 
   // Article card component
   const ArticleCard = ({ article, index }: { article: Article; index: number }) => {
-    const isFav = favorites.includes(article.id);
     const [showTldr, setShowTldr] = useState(false);
     const [tldr, setTldr] = useState<string>('');
     const [loadingTldr, setLoadingTldr] = useState(false);
@@ -586,6 +578,17 @@ const CheeseMiss = () => {
       } catch {}
     };
 
+    // Handle article click - redirect to external URL or show in detail view if no URL
+    const handleArticleClick = () => {
+      if (article.url) {
+        // Open the article URL in a new tab
+        window.open(article.url, '_blank', 'noopener,noreferrer');
+      } else {
+        // Fallback: show detail view if no URL available
+        setSelectedArticle(article);
+      }
+    };
+
     const tldrLines =
       tldr
         ?.split('\n')
@@ -595,10 +598,10 @@ const CheeseMiss = () => {
     return (
       <div
         className="group border border-gray-200 bg-white rounded-xl overflow-hidden hover:border-gray-300 transition-all duration-200 cursor-pointer"
-        onClick={() => setSelectedArticle(article)}
+        onClick={handleArticleClick}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && setSelectedArticle(article)}
+        onKeyDown={(e) => e.key === 'Enter' && handleArticleClick()}
       >
         <div className="relative">
           <img
@@ -607,20 +610,15 @@ const CheeseMiss = () => {
             onError={(e) => ((e.currentTarget as HTMLImageElement).src = FALLBACK_IMAGE)}
             className="w-full h-44 object-cover"
           />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFavorite(article.id);
-            }}
-            aria-label="Toggle favorite"
-            className={`absolute top-3 right-3 w-9 h-9 rounded-lg grid place-items-center transition-colors ${
-              isFav
-                ? 'bg-red-500 text-white'
-                : 'bg-white/90 text-gray-700 hover:bg-red-50 hover:text-red-600'
-            }`}
-          >
-            <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
-          </button>
+          
+          {/* External link indicator */}
+          {article.url && (
+            <div className="absolute top-3 left-3 w-8 h-8 rounded-lg bg-black/50 text-white grid place-items-center backdrop-blur-sm">
+              <ExternalLink className="w-4 h-4" />
+            </div>
+          )}
+          
+          
         </div>
 
         <div className="p-4">
@@ -635,7 +633,7 @@ const CheeseMiss = () => {
               <span aria-hidden>•</span>
               <span className={`flex items-center gap-1 ${getCategoryColor(article.category)}`}>
                 {getCategoryIcon(article.category)}
-                #{article.category.replace('-', ' ')}
+                {article.category.replace('-', ' ')}
               </span>
             </div>
             <div className="text-xs text-gray-400">#{index + 1}</div>
@@ -644,134 +642,86 @@ const CheeseMiss = () => {
           {/* TL;DR collapsible */}
           <div
             className={`transition-[max-height,opacity] duration-300 ease-out ${
-              showTldr ? 'max-h-80 opacity-100' : 'max-h-0 opacity-0'
-            } overflow-hidden`}
-            id={tldrId}
-            aria-hidden={!showTldr}
+              showTldr
+                ? 'max-h-[400px] opacity-100 mb-3'
+                : 'max-h-0 opacity-0 overflow-hidden'
+            }`}
           >
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-red-800">
-                  <Zap className="w-4 h-4" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wide">
-                    TL;DR
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  {loadingTldr ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] text-red-700">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      Summarizing…
-                    </span>
-                  ) : tldr ? (
-                    <button
-                      onClick={handleCopy}
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] border ${
-                        copied
-                          ? 'bg-red-600 text-white border-red-600'
-                          : 'bg-white text-red-700 border-red-200 hover:bg-red-100'
-                      }`}
-                      title="Copy summary"
-                    >
-                      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      {copied ? 'Copied' : 'Copy'}
-                    </button>
-                  ) : tldrError ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        generateTldr();
-                      }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] bg-white text-red-700 border border-red-200 hover:bg-red-100"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      Retry
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              {loadingTldr ? (
-                <div className="space-y-2" aria-live="polite">
-                  <div className="h-2.5 rounded bg-red-100 animate-pulse" />
-                  <div className="h-2.5 rounded bg-red-100 animate-pulse w-11/12" />
-                  <div className="h-2.5 rounded bg-red-100 animate-pulse w-9/12" />
-                </div>
-              ) : tldr ? (
-                tldrLines.length > 1 ? (
-                  <ul className="ml-5 list-disc text-[13px] text-red-900 leading-relaxed space-y-1">
-                    {tldrLines.map((line, idx) => (
-                      <li key={idx}>{line}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p
-                    className="text-[13px] text-red-900 leading-relaxed"
-                    style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 6,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+              <div className="flex items-center gap-2 text-yellow-800 font-medium mb-2">
+                <Zap className="w-4 h-4" />
+                TL;DR
+                {tldr && (
+                  <button
+                    onClick={handleCopy}
+                    className={`ml-auto p-1 rounded transition-colors ${
+                      copied
+                        ? 'bg-green-100 text-green-600'
+                        : 'hover:bg-yellow-100 text-yellow-600'
+                    }`}
+                    title={copied ? 'Copied!' : 'Copy summary'}
                   >
-                    {tldr}
-                  </p>
-                )
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  </button>
+                )}
+              </div>
+              {loadingTldr ? (
+                <div className="flex items-center gap-2 text-yellow-700">
+                  <div className="w-4 h-4 border-2 border-yellow-300 border-t-yellow-600 rounded-full animate-spin" />
+                  Summarizing...
+                </div>
               ) : tldrError ? (
-                <div className="flex items-center gap-2 text-red-700">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">{tldrError}</span>
+                <div className="text-red-600 text-xs">{tldrError}</div>
+              ) : tldr ? (
+                <div className="text-yellow-800 space-y-1">
+                  {tldrLines.map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
                 </div>
               ) : null}
             </div>
           </div>
 
           {/* Title */}
-          <h3
-            className="text-gray-900 font-semibold mb-1 leading-snug hover:text-red-600 transition-colors"
-            style={{
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
+          <h2 className="font-bold text-gray-900 mb-2 line-clamp-3 group-hover:text-red-700 transition-colors">
             {article.title}
-          </h3>
+          </h2>
 
           {/* Description */}
-          <p
-            className="text-gray-600 text-sm"
-            style={{
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
+          <p className="text-gray-600 text-sm mb-3 line-clamp-2 leading-relaxed">
             {article.description}
           </p>
 
-          {/* Footer (TL;DR only) */}
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs text-gray-500 px-2 py-1 rounded-lg bg-gray-50">
-              {getReadTime(article.description)}
-            </span>
-
-            <button
-              onClick={handleToggleTldr}
-              aria-controls={tldrId}
-              aria-expanded={showTldr}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                showTldr
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-700'
-              }`}
-              title="Toggle TL;DR"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              TL;DR
-            </button>
+          {/* Actions */}
+          <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center text-xs text-gray-500">
+              <span>
+                {getReadTime(article.description + (article.content || ''))} •{' '}
+                {article.url ? 'Click to read full article' : 'View details'}
+              </span>
+            </div>
+            
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                onClick={(e) => handleShare(e, article)}
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                title="Share article"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleToggleTldr}
+                className={`p-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                  showTldr
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-700'
+                }`}
+                title="Toggle TL;DR"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                TL;DR
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -780,7 +730,6 @@ const CheeseMiss = () => {
 
   // Article detail view
   if (selectedArticle) {
-    const isFav = favorites.includes(selectedArticle.id);
     return (
       <div className="min-h-screen bg-gray-50">
         {/* Progress bar */}
@@ -843,13 +792,6 @@ const CheeseMiss = () => {
 
               <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
                 <button
-                  onClick={() => toggleFavorite(selectedArticle.id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                    ${isFav ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                >
-                  {isFav ? 'Na-save na sa Favorites' : 'I-save sa Favorites'}
-                </button>
-                <button
                   onClick={(e) => handleShare(e, selectedArticle)}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
                 >
@@ -875,25 +817,26 @@ const CheeseMiss = () => {
           <DayScroller />
 
           {/* Categories */}
-          <div className="overflow-x-auto">
-            <div className="flex gap-2 pb-1">
-              {categories.map((c) => {
-                const active = selectedCategory === c.key;
-                const Icon = c.icon;
-                return (
-                  <button
-                    key={c.key}
-                    onClick={() => setSelectedCategory(c.key)}
-                    aria-pressed={active}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 flex items-center gap-2
-                      ${active ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {c.label}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {categories.map((c) => {
+              const active = selectedCategory === c.key;
+              const Icon = c.icon;
+              return (
+                <button
+                  key={c.key}
+                  onClick={() => setSelectedCategory(c.key)}
+                  aria-pressed={active}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 flex items-center gap-2 flex-shrink-0
+                    ${active
+                      ? 'bg-red-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {c.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Quick stats */}

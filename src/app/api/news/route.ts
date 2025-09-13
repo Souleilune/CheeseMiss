@@ -393,16 +393,30 @@ function parseGeminiResponse(text: string, category: string): NewsArticle[] {
       if (urlMatch) url = urlMatch[0];
     }
 
-    // Normalize date
-    let publishedAt = new Date(date).toISOString();
-    if (publishedAt === 'Invalid Date') {
+    // Normalize date - Fixed: Check if date is valid before calling toISOString()
+    let publishedAt: string;
+    try {
+      const dateObj = new Date(date);
+      // Check if the date is valid before calling toISOString()
+      if (isNaN(dateObj.getTime())) {
+        throw new Error('Invalid date');
+      }
+      publishedAt = dateObj.toISOString();
+    } catch (error) {
+      // Try to extract date using regex pattern
       const dMatch = block.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
       if (dMatch) {
         const y = Number(dMatch[1]);
         const m = Number(dMatch[2]);
         const d = Number(dMatch[3]);
-        publishedAt = new Date(Date.UTC(y, m - 1, d)).toISOString();
+        try {
+          publishedAt = new Date(Date.UTC(y, m - 1, d)).toISOString();
+        } catch (regexDateError) {
+          // If even the regex extracted date fails, use current date
+          publishedAt = new Date().toISOString();
+        }
       } else {
+        // Fallback to current date if no valid date found
         publishedAt = new Date().toISOString();
       }
     }
