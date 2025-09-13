@@ -279,7 +279,7 @@ const NewsApp = () => {
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Hanapin ang balita..."
+                placeholder="Hanapin ang cheese miss for today..."
                 aria-label="Search news"
                 className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400"
               />
