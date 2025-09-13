@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -23,17 +23,13 @@ import {
   ExternalLink,
   Check,
   Copy,
-  // NEW: icons for About modal
   Mail,
   Globe,
-  Github,
-  Twitter,
-  Facebook,
 } from 'lucide-react';
 
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=600&fit=crop&q=80';
+const FALLBACK_IMAGE =
+  'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=600&fit=crop&q=80';
 
-// NEW: Contact configuration (override with NEXT_PUBLIC_* envs)
 const CONTACT = {
   brand: process.env.NEXT_PUBLIC_BRAND_NAME || 'Beware',
   email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'virgildelacruz15@gmail.com',
@@ -72,7 +68,8 @@ type CategoryKey = 'all' | Article['category'];
 // Date helpers
 const msPerDay = 24 * 60 * 60 * 1000;
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+const endOfDay = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 const toDateInputValue = (d: Date) => {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -98,12 +95,15 @@ const CheeseMiss = () => {
   const [readProgress, setReadProgress] = useState(0);
   const [isFallbackMode, setIsFallbackMode] = useState(false);
 
-  // NEW: About modal state
+  // About modal state
   const [aboutOpen, setAboutOpen] = useState(false);
 
   // Day scroller window state
   const WINDOW_SIZE = 14; // days visible per window
   const [windowOffset, setWindowOffset] = useState(0);
+
+  // Search input ref (fixes focus issues)
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const categories: { key: CategoryKey; label: string; icon: LucideIcon }[] = [
     { key: 'all', label: 'All News', icon: Newspaper },
@@ -138,8 +138,15 @@ const CheeseMiss = () => {
       const response = await fetch(`/api/news?${params.toString()}`);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = (errorData as any).error || `HTTP ${response.status}`;
+        // Type-safe error extraction (no any)
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData: { error?: string } = await response.json();
+          if (errorData?.error) errorMessage = errorData.error;
+        } catch {
+          // ignore body parse errors
+        }
+
         const isRetryable = response.status >= 500 || response.status === 429;
 
         throw new Error(
@@ -151,7 +158,8 @@ const CheeseMiss = () => {
         );
       }
 
-      return response.json();
+      const data: ApiResponse = await response.json();
+      return data;
     },
     []
   );
@@ -179,18 +187,23 @@ const CheeseMiss = () => {
       } catch (err) {
         console.error('Error loading news:', err);
 
-        try {
-          const errorInfo = JSON.parse((err as Error).message);
-          setError({
-            message: (errorInfo as any).message || 'Failed to load news',
-            isRetryable: (errorInfo as any).isRetryable || false,
-          });
-        } catch {
-          setError({
-            message: 'Network error. Please check your connection.',
-            isRetryable: true,
-          });
+        // Parse our JSON stringified error safely (no any)
+        let parsed: { message?: string; isRetryable?: boolean } = {};
+        if (err instanceof Error) {
+          try {
+            const obj = JSON.parse(err.message);
+            if (obj && typeof obj === 'object') {
+              parsed = obj as { message?: string; isRetryable?: boolean };
+            }
+          } catch {
+            // ignore parse errors
+          }
         }
+
+        setError({
+          message: parsed.message || 'Failed to load news',
+          isRetryable: Boolean(parsed.isRetryable),
+        });
       } finally {
         setLoading(false);
         setRetrying(false);
@@ -449,18 +462,31 @@ const CheeseMiss = () => {
                 </span>
               )}
             </div>
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+
+            {/* Search (fixed focus) */}
+            <div
+              className="flex-1 relative"
+              onClick={() => searchInputRef.current?.focus()}
+            >
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"
+                aria-hidden="true"
+              />
               <input
+                ref={searchInputRef}
+                type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
                 placeholder="Para maging politically aware ka search mo..."
                 aria-label="Search news"
                 className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400"
               />
               {searchQuery && (
                 <button
+                  type="button"
                   aria-label="Clear search"
+                  onMouseDown={(e) => e.preventDefault()} // keep focus
                   onClick={() => setSearchQuery('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
@@ -468,6 +494,7 @@ const CheeseMiss = () => {
                 </button>
               )}
             </div>
+
             <div className="hidden sm:flex items-center gap-3 text-sm text-gray-500">
               <div className="px-2 py-1 rounded bg-gray-100 text-gray-700">{selectedLabel}</div>
             </div>
@@ -513,17 +540,14 @@ const CheeseMiss = () => {
     );
   };
 
-  // NEW: About modal component
+  // About modal
   const AboutModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
-    const [copiedEmail, setCopiedEmail] = useState(false);
-
     useEffect(() => {
       if (!open) return;
       const onKey = (e: KeyboardEvent) => {
         if (e.key === 'Escape') onClose();
       };
       document.addEventListener('keydown', onKey);
-      // Lock scroll while modal is open
       const prev = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
@@ -533,15 +557,6 @@ const CheeseMiss = () => {
     }, [open, onClose]);
 
     if (!open) return null;
-
-    const handleCopyEmail = async () => {
-      if (!CONTACT.email) return;
-      try {
-        await navigator.clipboard.writeText(CONTACT.email);
-        setCopiedEmail(true);
-        setTimeout(() => setCopiedEmail(false), 900);
-      } catch {}
-    };
 
     return (
       <div
@@ -568,7 +583,9 @@ const CheeseMiss = () => {
             About {CONTACT.brand}
           </h3>
           <p className="mt-1 text-sm text-gray-600">
-            This is an independent project that helps surface Filipino corruption-related news from local outlets. All news articles and images remain the property of their respective creators, and full credit goes to the original publishers.
+            This is an independent project that helps surface Filipino corruption-related news from local outlets. All
+            news articles and images remain the property of their respective creators, and full credit goes to the
+            original publishers.
           </p>
 
           <div className="mt-4 space-y-2 text-sm">
@@ -576,8 +593,8 @@ const CheeseMiss = () => {
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-gray-500" />
                 <a href={`mailto:${CONTACT.email}`} className="text-gray-800 hover:underline">
-                  virgildelacruz15@gmail.com
-                </a>        
+                  {CONTACT.email}
+                </a>
               </div>
             )}
 
@@ -594,34 +611,6 @@ const CheeseMiss = () => {
                 </a>
               </div>
             )}
-
-            {CONTACT.twitter && (
-              <div className="flex items-center gap-2">
-                <Twitter className="w-4 h-4 text-gray-500" />
-                <a
-                  href={CONTACT.twitter}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-800 hover:underline break-all"
-                >
-                  {CONTACT.twitter}
-                </a>
-              </div>
-            )}
-
-            {CONTACT.github && (
-              <div className="flex items-center gap-2">
-                <Github className="w-4 h-4 text-gray-500" />
-                <a
-                  href={CONTACT.github}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-800 hover:underline break-all"
-                >
-                  {CONTACT.github}
-                </a>
-              </div>
-            )}
           </div>
 
           <div className="mt-4 text-[11px] text-gray-500">
@@ -632,7 +621,7 @@ const CheeseMiss = () => {
     );
   };
 
-  // Article card component
+  // Article card
   const ArticleCard = ({ article, index }: { article: Article; index: number }) => {
     const [showTldr, setShowTldr] = useState(false);
     const [tldr, setTldr] = useState<string>('');
@@ -897,7 +886,7 @@ const CheeseMiss = () => {
             </div>
           </article>
 
-          {/* NEW: About link + modal in detail view bottom */}
+          {/* About link + modal in detail view bottom */}
           <div className="mt-10 text-center text-xs text-gray-500">
             <button
               onClick={() => setAboutOpen(true)}
@@ -909,7 +898,7 @@ const CheeseMiss = () => {
           </div>
         </div>
 
-        {/* NEW: Modal mount */}
+        {/* Modal mount */}
         <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
       </div>
     );
@@ -933,8 +922,9 @@ const CheeseMiss = () => {
                   key={c.key}
                   onClick={() => setSelectedCategory(c.key)}
                   aria-pressed={active}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 flex items-center gap-2 flex-shrink-0
-                    ${active ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 flex items-center gap-2 flex-shrink-0 ${
+                    active ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 >
                   <Icon className="w-4 h-4" />
                   {c.label}
@@ -945,10 +935,16 @@ const CheeseMiss = () => {
 
           <div className="flex items-center justify-between text-sm text-gray-500">
             <span>
-              {loading ? 'Loading…' : error ? 'May error sa pagkuha ng balita' : `${filteredArticles.length} articles`}
+              {loading
+                ? 'Loading…'
+                : error
+                ? 'May error sa pagkuha ng balita'
+                : `${filteredArticles.length} articles`}
             </span>
             {isFallbackMode && (
-              <span className="text-orange-600 text-xs">🔄 Demo data (API key needed for live news)</span>
+              <span className="text-orange-600 text-xs">
+                🔄 Demo data (API key needed for live news)
+              </span>
             )}
           </div>
         </div>
@@ -1007,7 +1003,7 @@ const CheeseMiss = () => {
         )}
       </div>
 
-      {/* NEW: About link at bottom */}
+      {/* About link at bottom */}
       <div className="max-w-3xl mx-auto px-4 pb-12 text-center text-xs text-gray-500">
         <button
           onClick={() => setAboutOpen(true)}
@@ -1029,7 +1025,7 @@ const CheeseMiss = () => {
         </button>
       )}
 
-      {/* NEW: Modal mount */}
+      {/* Modal mount */}
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
