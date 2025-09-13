@@ -143,9 +143,33 @@ function setCached(key: CacheKey, articles: NewsArticle[], providerTrace: string
 // Utilities
 const withinWindow = (iso: string, from?: string | null, to?: string | null) => {
   if (!from && !to) return true;
-  const t = new Date(iso).getTime();
-  if (from && t < new Date(from).getTime()) return false;
-  if (to && t > new Date(to).getTime()) return false;
+  
+  const articleTime = new Date(iso).getTime();
+  
+  // Handle invalid dates
+  if (isNaN(articleTime)) {
+    console.warn('Invalid date in article:', iso);
+    return true; // Include articles with invalid dates rather than exclude them
+  }
+  
+  if (from) {
+    const fromTime = new Date(from).getTime();
+    if (isNaN(fromTime)) {
+      console.warn('Invalid from date:', from);
+    } else if (articleTime < fromTime) {
+      return false;
+    }
+  }
+  
+  if (to) {
+    const toTime = new Date(to).getTime();
+    if (isNaN(toTime)) {
+      console.warn('Invalid to date:', to);
+    } else if (articleTime > toTime) {
+      return false;
+    }
+  }
+  
   return true;
 };
 
@@ -526,13 +550,26 @@ async function webSearchTavily(
   if (!key) throw new Error('Tavily API not configured');
 
   let time_range: TavilyPayload['time_range'] | undefined = undefined;
+  let daysFromToday = 0; // Moved outside if block to fix scope issue
+  
   if (from || to) {
     const start = from ? new Date(from).getTime() : Date.now() - 365 * 24 * 60 * 60 * 1000;
     const end = to ? new Date(to).getTime() : Date.now();
     const spanDays = Math.max(1, Math.round((end - start) / (24 * 60 * 60 * 1000)));
-    if (spanDays <= 7) time_range = 'week';
-    else if (spanDays <= 31) time_range = 'month';
-    else time_range = 'year';
+    
+    // Calculate how far back the start date is from today
+    daysFromToday = Math.floor((Date.now() - start) / (24 * 60 * 60 * 1000));
+    
+    // For very old dates (more than 365 days), don't use time_range restriction
+    if (daysFromToday > 365) {
+      time_range = undefined; // Remove time restriction for old dates
+    } else if (spanDays <= 7) {
+      time_range = 'week';
+    } else if (spanDays <= 31) {
+      time_range = 'month';
+    } else {
+      time_range = 'year';
+    }
   }
 
   const query = buildCategoryQuery(category, userQuery);
@@ -547,7 +584,7 @@ async function webSearchTavily(
     include_raw_content: false,
     include_images: false,
     language: 'en',
-    time_range,
+    time_range, // Will be undefined for very old dates
   };
 
   const run = async (payload: TavilyPayload) =>
@@ -580,10 +617,15 @@ async function webSearchTavily(
     .filter((a) => isLocalOutlet(a.source.name, a.url))
     .filter((a) => withinWindow(a.publishedAt, from, to));
 
-  // Pass 2: widen if empty
+  // Pass 2: widen if empty - enhanced for old dates
   if (!items.length) {
     const widened: TavilyPayload = { ...basePayload };
     delete widened.include_domains;
+    // For old dates, also remove time_range completely to maximize results
+    if (daysFromToday > 365) {
+      delete widened.time_range;
+    }
+    
     data = await run(widened);
     mapped = (data.results || []).map((r, i): NewsArticle => {
       const publishedAt = r.published_date ? new Date(r.published_date).toISOString() : new Date().toISOString();
@@ -608,6 +650,7 @@ async function webSearchTavily(
 
   return dedupeArticles(items).slice(0, pageSize);
 }
+
 
 // Serper types
 type SerperNewsItem = {

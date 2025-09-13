@@ -77,6 +77,99 @@ const toDateInputValue = (d: Date) => {
 const toLabel = (d: Date) =>
   d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
+const TopBar = React.memo(({ 
+  searchQuery, 
+  setSearchQuery, 
+  searchInputRef, 
+  selectedDay, 
+  isFallbackMode,
+  CONTACT 
+}: {
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  searchInputRef: React.RefObject<HTMLInputElement | null>; // ← Fixed this line
+  selectedDay: string | null;
+  isFallbackMode: boolean;
+  CONTACT: {
+    brand: string;
+    email: string;
+    website: string;
+    twitter: string;
+    github: string;
+  };
+}) => {
+  const selectedLabel = selectedDay ? toLabel(new Date(selectedDay)) : 'All recent days';
+
+  // Memoized handlers to prevent re-renders
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, [setSearchQuery]);
+
+  const handleSearchClear = useCallback(() => {
+    setSearchQuery('');
+    // Keep focus on the input after clearing
+    requestAnimationFrame(() => {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    });
+  }, [setSearchQuery, searchInputRef]);
+
+  return (
+    <div className="bg-white/90 backdrop-blur border-b border-gray-200">
+      <div className="max-w-3xl mx-auto px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-900 tracking-tight">
+              {CONTACT.brand}
+            </span>
+            {isFallbackMode && (
+              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                Demo Mode
+              </span>
+            )}
+          </div>
+
+          {/* Search - Fixed to prevent re-render issues */}
+          <div className="flex-1 relative">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none"
+              aria-hidden="true"
+            />
+            <input
+              key="search-input" // Stable key prevents recreation
+              ref={searchInputRef}
+              type="search"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder="Para maging politically aware ka search mo..."
+              aria-label="Search news"
+              className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors duration-200"              autoComplete="off"
+              spellCheck="false"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={handleSearchClear}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="hidden sm:flex items-center gap-3 text-sm text-gray-500">
+            <div className="px-2 py-1 rounded bg-gray-100 text-gray-700">{selectedLabel}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+TopBar.displayName = 'TopBar';
+
 const CheeseMiss = () => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,22 +306,31 @@ const CheeseMiss = () => {
   );
 
   useEffect(() => {
-    const day = selectedDay ? startOfDay(new Date(selectedDay)) : null;
-    const from = day ? startOfDay(day).toISOString() : undefined;
-    const to = day ? endOfDay(day).toISOString() : undefined;
+  // FIXED: Improved date handling for selectedDay
+  const day = selectedDay ? new Date(selectedDay) : null;
+  
+  // Ensure we have a valid date
+  if (day && isNaN(day.getTime())) {
+    console.warn('Invalid selectedDay:', selectedDay);
+    return;
+  }
+  
+  // FIXED: Use proper start/end of day with timezone consideration
+  const from = day ? startOfDay(day).toISOString() : undefined;
+  const to = day ? endOfDay(day).toISOString() : undefined;
 
-    const delay = searchQuery ? 500 : 0;
-    const t = setTimeout(() => {
-      loadNews({
-        category: selectedCategory === 'all' ? undefined : selectedCategory,
-        query: searchQuery || undefined,
-        from,
-        to,
-      });
-    }, delay);
+  const delay = searchQuery ? 500 : 0;
+  const t = setTimeout(() => {
+    loadNews({
+      category: selectedCategory === 'all' ? undefined : selectedCategory,
+      query: searchQuery || undefined,
+      from,
+      to,
+    });
+  }, delay);
 
-    return () => clearTimeout(t);
-  }, [selectedCategory, selectedDay, searchQuery, loadNews]);
+  return () => clearTimeout(t);
+}, [selectedCategory, selectedDay, searchQuery, loadNews]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -445,64 +547,6 @@ const CheeseMiss = () => {
     );
   };
 
-  const TopBar = () => {
-    const selectedLabel = selectedDay ? toLabel(new Date(selectedDay)) : 'All recent days';
-
-    return (
-      <div className="bg-white/90 backdrop-blur border-b border-gray-200">
-        <div className="max-w-3xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-gray-900 tracking-tight">
-                {CONTACT.brand}
-              </span>
-              {isFallbackMode && (
-                <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-                  Demo Mode
-                </span>
-              )}
-            </div>
-
-            {/* Search (fixed focus) */}
-            <div
-              className="flex-1 relative"
-              onClick={() => searchInputRef.current?.focus()}
-            >
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"
-                aria-hidden="true"
-              />
-              <input
-                ref={searchInputRef}
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
-                placeholder="Para maging politically aware ka search mo..."
-                aria-label="Search news"
-                className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-gray-200 bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  aria-label="Clear search"
-                  onMouseDown={(e) => e.preventDefault()} // keep focus
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            <div className="hidden sm:flex items-center gap-3 text-sm text-gray-500">
-              <div className="px-2 py-1 rounded bg-gray-100 text-gray-700">{selectedLabel}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const ErrorDisplay = () => {
     if (!error) return null;
@@ -818,7 +862,14 @@ const CheeseMiss = () => {
           style={{ width: `${readProgress}%` }}
         />
 
-        <TopBar />
+        <TopBar
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchInputRef={searchInputRef}
+            selectedDay={selectedDay}
+            isFallbackMode={isFallbackMode}
+            CONTACT={CONTACT}
+        />
 
         <div className="max-w-2xl mx-auto px-4 py-6">
           <button
@@ -907,7 +958,14 @@ const CheeseMiss = () => {
   // Main list view
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopBar />
+      <TopBar
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        searchInputRef={searchInputRef}
+        selectedDay={selectedDay}
+        isFallbackMode={isFallbackMode}
+        CONTACT={CONTACT}
+      />
 
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 py-3 space-y-4">
