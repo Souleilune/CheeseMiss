@@ -1,4 +1,5 @@
-import { NewsArticle, NewsResponse } from '@/app/api/news/route';
+// FIXED: Removed unused import
+import { NewsResponse } from '@/app/api/news/route';
 
 const API_BASE = '/api/news';
 
@@ -74,14 +75,16 @@ export async function getCategories() {
 }
 
 // Client-side utility to handle errors gracefully
-export function handleApiError(error: any): string {
-  if (error.message?.includes('fetch')) {
+export function handleApiError(error: unknown): string { // FIXED: changed from 'any' to 'unknown'
+  const err = error as Error; // Safe type assertion
+  
+  if (err.message?.includes('fetch')) {
     return 'Network error. Please check your connection.';
   }
   
-  if (error.message?.includes('API key')) {
+  if (err.message?.includes('API key')) {
     return 'News service is temporarily unavailable.';
   }
   
-  return error.message || 'Something went wrong. Please try again.';
+  return err.message || 'Something went wrong. Please try again.';
 }

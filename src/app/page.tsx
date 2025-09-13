@@ -4,11 +4,8 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Search,
-  Heart,
   Share2,
-  MessageCircle,
   X,
-  Bookmark,
   ArrowUp,
   AlertCircle,
   RefreshCw,
@@ -26,6 +23,7 @@ import {
   Check,
   Copy  // For read more button
 } from 'lucide-react';
+// FIXED: Removed unused imports: Heart, MessageCircle, Bookmark
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&h=800&fit=crop&q=80';
 
@@ -89,7 +87,7 @@ const CheeseMiss = () => {
   const WINDOW_SIZE = 14; // days visible per window
   const [windowOffset, setWindowOffset] = useState(0); // 0 = includes today; grows older by WINDOW_SIZE steps
 
-  // Categories using lucide icons
+  // Categories using lucide icons (removed favorites)
   const categories: { key: CategoryKey; label: string; icon: LucideIcon }[] = [
     { key: 'all', label: 'All News', icon: Newspaper },
     { key: 'flood-control', label: 'Flood Control', icon: Waves },
@@ -189,7 +187,7 @@ const CheeseMiss = () => {
 
   // Load news on mount and when filters change (debounced for search)
   useEffect(() => {
-    const today = startOfDay(new Date());
+    // FIXED: removed unused 'today' variable
     const day = selectedDay ? startOfDay(new Date(selectedDay)) : null;
     const from = day ? startOfDay(day).toISOString() : undefined;
     const to = day ? endOfDay(day).toISOString() : undefined;
@@ -206,7 +204,6 @@ const CheeseMiss = () => {
 
     return () => clearTimeout(t);
   }, [selectedCategory, selectedDay, searchQuery, loadNews]);
-  
 
   // UI listeners for scroll
   useEffect(() => {
@@ -224,7 +221,7 @@ const CheeseMiss = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, [selectedArticle]);
 
-  // Filter articles (client-side) for favorites/day (kept for mock data)
+  // Filter articles (client-side) for day filtering (simplified without favorites)
   const filteredArticles = useMemo(() => {
     let filtered = articles;
 
@@ -236,7 +233,7 @@ const CheeseMiss = () => {
     }
 
     return filtered;
-  }, [articles, selectedCategory, selectedDay,]);
+  }, [articles, selectedDay]); // FIXED: removed selectedCategory from dependencies
 
   // Utilities
   const formatTime = (dateString: string) => {
@@ -480,8 +477,6 @@ const CheeseMiss = () => {
             </div>
             <div className="hidden sm:flex items-center gap-3 text-sm text-gray-500">
               <div className="px-2 py-1 rounded bg-gray-100 text-gray-700">{selectedLabel}</div>
-              
-              
             </div>
           </div>
         </div>
@@ -534,7 +529,7 @@ const CheeseMiss = () => {
     const [tldrError, setTldrError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
-    const tldrId = `tldr-${article.id}-${index}`;
+    // FIXED: removed unused tldrId variable
 
     const generateTldr = async () => {
       if (tldr || loadingTldr) return;
@@ -617,8 +612,6 @@ const CheeseMiss = () => {
               <ExternalLink className="w-4 h-4" />
             </div>
           )}
-          
-          
         </div>
 
         <div className="p-4">

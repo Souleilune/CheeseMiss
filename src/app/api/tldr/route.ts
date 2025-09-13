@@ -1,49 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-interface TldrRequest {
-  title: string;
-  description: string;
-  content?: string;
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const { title, description, content }: TldrRequest = await request.json();
-
-    if (!title || !description) {
-      return NextResponse.json(
-        { error: 'Title and description are required' },
-        { status: 400 }
-      );
+    const { title, description, content } = await request.json();
+    
+    if (!title && !description) {
+      return NextResponse.json({ error: 'Title or description is required' }, { status: 400 });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Gemini API key not configured' },
-        { status: 500 }
-      );
+      return NextResponse.json({ 
+        tldr: generateFallbackTldr(title, description),
+        fallback: true 
+      });
     }
 
-    // Use the same Gemini endpoint structure as your existing code
-    const configuredUrl = process.env.GEMINI_API_URL;
-    const url = `${configuredUrl || getGeminiEndpoint()}?key=${apiKey}`;
+    const url = `${getGeminiEndpoint()}?key=${apiKey}`;
+    
+    const prompt = `Create a very brief TL;DR summary (max 2-3 sentences) in Filipino/Tagalog for this corruption news article:
 
-    // Create focused TLDR prompt for Philippine corruption news
-    const prompt = `Gumawa ng maikling TLDR para sa Filipino corruption news article na ito:
+Title: ${title}
+Description: ${description}
+Content: ${content || description}
 
-TITLE: ${title}
-DESCRIPTION: ${description}
-${content ? `CONTENT: ${content}` : ''}
-
-Instructions:
-- Gumawa ng 1-2 sentences na TLDR sa Filipino/Taglish
-- I-highlight ang mga key corruption details (amounts, names, locations)
-- Gamitin ang format: "TLDR: [summary]"
-- Mag-focus sa mga konkretong detalye like ₱ amounts, officials involved
-- Keep it under 150 characters for mobile readability
-
-Example format: "TLDR: Si Mayor X, naaresto dahil sa ₱500M ghost project sa Cebu. COA audit nagtukoy ng overpricing at kickbacks."`;
+Focus on: WHO is involved, HOW MUCH money/corruption, WHERE it happened.
+Keep it short, factual, and in Filipino. Start directly with the summary, no "TL;DR:" prefix.`;
 
     const requestBody = {
       contents: [{ parts: [{ text: prompt }] }]
@@ -60,7 +42,16 @@ Example format: "TLDR: Si Mayor X, naaresto dahil sa ₱500M ghost project sa Ce
       throw new Error(`Gemini API responded with ${response.status}${errText ? `: ${errText}` : ''}`);
     }
 
-    const data = await response.json().catch(() => ({} as any));
+    const data = await response.json() as { // FIXED: proper typing instead of 'any'
+      candidates?: Array<{
+        content?: {
+          parts?: Array<{
+            text?: string;
+          }>;
+        };
+      }>;
+    };
+    
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     // Extract TLDR from response

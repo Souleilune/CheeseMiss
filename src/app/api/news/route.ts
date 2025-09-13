@@ -511,13 +511,13 @@ async function webSearchTavily(
 
   const query = buildCategoryQuery(category, userQuery);
 
-  const payload: any = {
+  const payload: Record<string, unknown> = { // FIXED: changed from 'any' to proper type
     api_key: key,
     query,
     search_depth: 'advanced',
-    include_domains: PH_DOMAINS,        // array of PH domains
-    exclude_domains: EXCLUDE_DOMAINS,   // exclude aggregators
-    max_results: Math.min(10, Math.max(3, pageSize)), // Tavily caps at 10
+    include_domains: PH_DOMAINS,
+    exclude_domains: EXCLUDE_DOMAINS,
+    max_results: Math.min(10, Math.max(3, pageSize)),
     include_answer: false,
     include_raw_content: false,
     include_images: false,
@@ -536,86 +536,31 @@ async function webSearchTavily(
     throw new Error(`Tavily responded with ${res.status}${errText ? `: ${errText}` : ''}`);
   }
 
-  const data = await res.json();
+    const data = await res.json() as { results?: Array<Record<string, unknown>> }; // FIXED: proper typing
 
-  const items: NewsArticle[] = (data.results || [])
-    .map((r: any, i: number) => {
-      const publishedAt = r.published_date ? new Date(r.published_date).toISOString() : new Date().toISOString();
-      const sourceName = guessSourceName(r.url, r.source);
-      return {
-        id: `tavily_${Date.now()}_${i}`,
-        title: r.title,
-        description: r.content || r.snippet || 'No description.',
-        url: r.url,
-        urlToImage: undefined,
-        publishedAt,
-        source: { name: sourceName },
-        category: category as any,
-        content: r.snippet || r.content,
-      };
-    })
-    .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
-    .filter((a: NewsArticle) => withinWindow(a.publishedAt, from, to));
+    const items: NewsArticle[] = (data.results || [])
+        .map((r: Record<string, unknown>, i: number) => { // FIXED: proper typing
+        const publishedAt = (r.published_date as string) ? new Date(r.published_date as string).toISOString() : new Date().toISOString();
+        const sourceName = guessSourceName(r.url as string, r.source as string);
+        return {
+            id: `tavily_${Date.now()}_${i}`,
+            title: r.title as string,
+            description: (r.content as string) || (r.snippet as string) || 'No description.',
+            url: r.url as string,
+            urlToImage: undefined,
+            publishedAt,
+            source: { name: sourceName },
+            category: category as NewsArticle['category'],
+            content: (r.snippet as string) || (r.content as string),
+        };
+        })
+        .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
+        .filter((a: NewsArticle) => withinWindow(a.publishedAt, from, to));
 
-  return dedupeArticles(items).slice(0, pageSize);
-}
-
+    return dedupeArticles(items).slice(0, pageSize);
+    }
 // 2) Brave Search (good published timestamp in many results)
-async function webSearchBrave(
-  category: string,
-  userQuery?: string | null,
-  from?: string | null,
-  to?: string | null,
-  pageSize: number = 20
-): Promise<NewsArticle[]> {
-  const key = process.env.BRAVE_SEARCH_API_KEY;
-  if (!key) throw new Error('Brave Search API not configured');
 
-  // Build a site-restricted query
-  const siteFilter = PH_DOMAINS.map((d) => `site:${d}`).join(' OR ');
-  const query = `${buildCategoryQuery(category, userQuery)} (${siteFilter})`;
-
-  const url = new URL('https://api.search.brave.com/res/v1/web/search');
-  url.searchParams.set('q', query);
-  url.searchParams.set('count', String(Math.min(20, Math.max(10, pageSize))));
-  url.searchParams.set('country', 'ph');
-  url.searchParams.set('search_lang', 'en');
-  url.searchParams.set('safesearch', 'moderate');
-  url.searchParams.set('freshness', from || to ? 'relevance' : 'new'); // hint only
-
-  const res = await fetch(url.toString(), {
-    headers: { 'X-Subscription-Token': key },
-  });
-  if (!res.ok) throw new Error(`Brave responded with ${res.status}`);
-  const data = await res.json();
-
-  const results = data?.web?.results || [];
-
-  const items: NewsArticle[] = results
-    .map((r: any, i: number) => {
-      const published =
-        r.published || r.age?.published || r.page_age || null;
-      const publishedAt = published ? new Date(published).toISOString() : new Date().toISOString();
-      const host = getHostname(r.url);
-      const sourceName = guessSourceName(r.url, r.meta_url?.display || r.profile?.name);
-
-      return {
-        id: `brave_${Date.now()}_${i}`,
-        title: r.title,
-        description: r.description || r.snippet || 'No description.',
-        url: r.url,
-        urlToImage: undefined,
-        publishedAt,
-        source: { name: sourceName },
-        category: category as any,
-        content: r.snippet || r.description,
-      };
-    })
-    .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
-    .filter((a: NewsArticle) => withinWindow(a.publishedAt, from, to));
-
-  return dedupeArticles(items).slice(0, pageSize);
-}
 
 // 3) Serper.dev (Google) news results
 async function webSearchSerper(
@@ -652,22 +597,22 @@ async function webSearchSerper(
   if (!res.ok) throw new Error(`Serper responded with ${res.status}`);
   const data = await res.json();
 
-  const items: NewsArticle[] = (data?.news || [])
-    .map((r: any, i: number) => {
-      const publishedAt = r.date ? new Date(r.date).toISOString() : new Date().toISOString();
-      const host = getHostname(r.link);
-      const sourceName = guessSourceName(r.link, r.source);
+   const items: NewsArticle[] = (data?.news || [])
+    .map((r: Record<string, unknown>, i: number) => { // FIXED: proper typing
+      const publishedAt = (r.date as string) ? new Date(r.date as string).toISOString() : new Date().toISOString();
+      // FIXED: removed unused 'host' variable
+      const sourceName = guessSourceName(r.link as string, r.source as string);
 
       return {
         id: `serper_${Date.now()}_${i}`,
-        title: r.title,
-        description: r.snippet || 'No description.',
-        url: r.link,
-        urlToImage: r.imageUrl,
+        title: r.title as string,
+        description: (r.snippet as string) || 'No description.',
+        url: r.link as string,
+        urlToImage: r.imageUrl as string,
         publishedAt,
         source: { name: sourceName },
-        category: category as any,
-        content: r.snippet,
+        category: category as NewsArticle['category'],
+        content: r.snippet as string,
       };
     })
     .filter((a: NewsArticle) => isLocalOutlet(a.source.name, a.url))
@@ -689,15 +634,12 @@ async function searchWithWeb(
   const tryOrder: Array<() => Promise<NewsArticle[]>> = [];
 
   const hasTavily = !!process.env.TAVILY_API_KEY;
-  const hasBrave = !!process.env.BRAVE_SEARCH_API_KEY;
+  
   const hasSerper = !!process.env.SERPER_API_KEY;
 
   const pushByName = (name: string) => {
     if (name === 'tavily' && hasTavily) {
       tryOrder.push(() => webSearchTavily(category, query, from, to, pageSize));
-    }
-    if (name === 'brave' && hasBrave) {
-      tryOrder.push(() => webSearchBrave(category, query, from, to, pageSize));
     }
     if (name === 'serper' && hasSerper) {
       tryOrder.push(() => webSearchSerper(category, query, from, to, pageSize));
@@ -709,7 +651,6 @@ async function searchWithWeb(
   if (tryOrder.length === 0) {
     // Auto-detect
     if (hasTavily) tryOrder.push(() => webSearchTavily(category, query, from, to, pageSize));
-    if (hasBrave) tryOrder.push(() => webSearchBrave(category, query, from, to, pageSize));
     if (hasSerper) tryOrder.push(() => webSearchSerper(category, query, from, to, pageSize));
   }
 
@@ -740,7 +681,7 @@ async function fetchNewsApiBatch(params: URLSearchParams) {
     `https://newsapi.org/v2/everything?${params.toString()}`
   );
   if (!response.ok) throw new Error(`NewsAPI responded with ${response.status}`);
-  return response.json();
+  return response.json() as Promise<{ articles?: Array<Record<string, unknown>> }>;
 }
 
 async function fallbackNewsAPISearch(
@@ -798,28 +739,28 @@ async function fallbackNewsAPISearch(
     data = await fetchNewsApiBatch(withoutDomains);
   }
 
-  let items: NewsArticle[] = (data.articles || [])
-    .filter((article: any) => {
-      const url = article.url || '';
-      const host = getHostname(url);
-      if (EXCLUDE_DOMAINS.includes(host)) return false;
-      return isLocalOutlet(article.source?.name, url);
-    })
-    .filter((article: any) => withinWindow(article.publishedAt, from, to))
-    .map((article: any, index: number) => ({
-      id: `newsapi_${Date.now()}_${index}`,
-      title: article.title,
-      description: article.description,
-      url: article.url,
-      urlToImage: article.urlToImage,
-      publishedAt: article.publishedAt,
-      source: { name: article.source?.name || guessSourceName(article.url) },
-      category: category as any,
-      content: article.content,
-    }));
+    let items: NewsArticle[] = (data.articles || [])
+        .filter((article: Record<string, unknown>) => { // FIXED: proper typing
+        const url = (article.url as string) || '';
+        const host = getHostname(url);
+        if (EXCLUDE_DOMAINS.includes(host)) return false;
+        return isLocalOutlet((article.source as Record<string, unknown>)?.name as string, url);
+        })
+        .filter((article: Record<string, unknown>) => withinWindow(article.publishedAt as string, from, to)) // FIXED: proper typing
+        .map((article: Record<string, unknown>, index: number) => ({ // FIXED: proper typing
+        id: `newsapi_${Date.now()}_${index}`,
+        title: article.title as string,
+        description: article.description as string,
+        url: article.url as string,
+        urlToImage: article.urlToImage as string,
+        publishedAt: article.publishedAt as string,
+        source: { name: ((article.source as Record<string, unknown>)?.name as string) || guessSourceName(article.url as string) },
+        category: category as NewsArticle['category'],
+        content: article.content as string,
+        }));
 
-  items = dedupeArticles(items);
-  return items.slice(0, pageSize);
+    items = dedupeArticles(items);
+    return items.slice(0, pageSize);
 }
 
 export async function GET(request: NextRequest) {
